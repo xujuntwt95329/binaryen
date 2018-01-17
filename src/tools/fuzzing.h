@@ -63,6 +63,11 @@ public:
     if (bytes.size() == 0) {
       bytes.push_back(0);
     }
+    readyValues[none];
+    readyValues[i32];
+    readyValues[i64];
+    readyValues[f32];
+    readyValues[f64];
   }
 
   void pickPasses(OptimizationOptions& options) {
@@ -442,7 +447,26 @@ private:
 
   int nesting = 0;
 
+  // a set of values ready for use in make*()
+  std::map<WasmType, std::vector<Expression*>> readyValues;
+
+  Expression* getReadyValue(WasmType type) {
+    if (!readyValues[type].empty()) {
+      auto ret = readyValues[type].back();
+      readyValues[type].pop_back();
+      return ret;
+    }
+    return nullptr;
+  }
+
+  void addReadyValue(Expression* expr) {
+    readyValues[expr->type].push_back(expr);
+  }
+
   Expression* make(WasmType type) {
+    auto* ready = getReadyValue(type);
+    if (ready) return ready;
+
     // when we should stop, emit something small (but not necessarily trivial)
     if (finishedInput ||
         nesting >= 5 * NESTING_LIMIT || // hard limit
@@ -622,13 +646,28 @@ private:
     ret->name = makeLabel();
     breakableStack.push_back(ret);
     hangStack.push_back(ret);
+    // add loop vars sometimes for more natural loop testing
+    Index numLoopVars = 0;
+    std::vector<Index> loopVars;
     // either create random content, or do something more targeted
-    if (oneIn(2)) {
+    if (oneIn(2) || func->getNumLocals() == 0) {
       ret->body = makeMaybeBlock(type);
     } else {
       // ensure a branch back. also optionally create some loop vars
+      numLoopVars = upToSquared(5);
+      for (Index i = 0; i < numLoopVars; i++) {
+        loopVars.push_back(upTo(func->getNumLocals()));
+      }
       std::vector<Expression*> list;
       list.push_back(makeMaybeBlock(none)); // primary contents
+      // if we have loop vars, make some values for them to use
+      for (Index i = 0; i < numLoopVars; i++) {
+        addReadyValue(make(func->getLocalType(loopVars[i])));
+      }
+      for (Index i = 0; i < numLoopVars; i++) {
+        list.push_back(make(none));
+      }
+// must claer the  ready values - they can't be used later in another place!
       list.push_back(builder.makeBreak(ret->name, nullptr, makeCondition())); // possible branch back
       list.push_back(make(type)); // final element, so we have the right type
       ret->body = builder.makeBlock(list);
@@ -642,7 +681,19 @@ private:
       );
     }
     ret->finalize();
-    return ret;
+    if (numLoopVars > 0) {
+      // initialize the loop vars
+      auto* outer = builder.makeBlock();
+      for (Index i = 0; i < numLoopVars; i++) {
+        auto index = loopVars[i];
+        outer->list.push_back(builder.makeSetLocal(index, make(func->getLocalType(index))));
+      }
+      outer->list.push_back(ret);
+      outer->finalize();
+      return outer;
+    } else {
+      return ret;
+    }
   }
 
   Expression* makeCondition() {
