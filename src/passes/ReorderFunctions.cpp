@@ -19,12 +19,8 @@
 // binaries because fewer bytes are needed to encode references to frequently
 // used functions.
 //
-// This may incur a tradeoff, though, as while it reduces binary size, it may
-// increase gzip size. This might be because the new order has the functions in
-// a less beneficial position for compression, that is, mutually-compressible
-// functions are no longer together (when they were before, in the original order,
-// the has some natural tendency one way or the other). TODO: investigate
-// similarity ordering here.
+// Secondarily, sorts by similarity, to keep similar functions close together,
+// which can help with gzip size.
 //
 
 
@@ -57,6 +53,11 @@ private:
 
 struct ReorderFunctions : public Pass {
   void run(PassRunner* runner, Module* module) override {
+    // note original indexes, to break ties
+    std::unordered_map<Name, Index> originalIndexes;
+    for (Index i = 0; i < module->functions.size(); i++) {
+      originalIndexes[module->functions[i]->name] = i;
+    }
     NameCountMap counts;
     // fill in info, as we operate on it in parallel (each function to its own entry)
     for (auto& func : module->functions) {
@@ -82,11 +83,11 @@ struct ReorderFunctions : public Pass {
       }
     }
     // sort
-    std::sort(module->functions.begin(), module->functions.end(), [&counts](
+    std::sort(module->functions.begin(), module->functions.end(), [&counts, &originalIndexes](
       const std::unique_ptr<Function>& a,
       const std::unique_ptr<Function>& b) -> bool {
       if (counts[a->name] == counts[b->name]) {
-        return strcmp(a->name.str, b->name.str) > 0;
+        return originalIndexes[a->name] < originalIndexes[b->name];
       }
       return counts[a->name] > counts[b->name];
     });
