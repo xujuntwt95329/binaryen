@@ -28,6 +28,7 @@
 
 #include <wasm.h>
 #include <pass.h>
+#include <wasm-binary.h>
 
 namespace wasm {
 
@@ -55,7 +56,8 @@ struct ReorderFunctions : public Pass {
   void run(PassRunner* runner, Module* module) override {
     // note original indexes, to break ties
     std::unordered_map<Name, Index> originalIndexes;
-    for (Index i = 0; i < module->functions.size(); i++) {
+    auto numFunctions = module->functions.size();
+    for (Index i = 0; i < numFunctions; i++) {
       originalIndexes[module->functions[i]->name] = i;
     }
     NameCountMap counts;
@@ -82,7 +84,7 @@ struct ReorderFunctions : public Pass {
         counts[curr]++;
       }
     }
-    // sort
+    // sort by uses, break ties with original order
     std::sort(module->functions.begin(), module->functions.end(), [&counts, &originalIndexes](
       const std::unique_ptr<Function>& a,
       const std::unique_ptr<Function>& b) -> bool {
@@ -91,7 +93,37 @@ struct ReorderFunctions : public Pass {
       }
       return counts[a->name] > counts[b->name];
     });
+    // secondarily, sort by similarity, but without changing LEB sizes
+    // write out the binary so we can see function contents
+    BufferWithRandomAccess buffer;
+    WasmBinaryWriter writer(module, buffer);
+    writer.write();
+    // get a profile of each function, which we can then use to compare
+    std::unordered_map<Name, Index> profiles;
+    for (Index i = 0; i < numFunctions; i++) {
+      auto& info = writer.tableOfContents.functionBodies[i];
+      profiles[module->functions[i]->name] = Profile(&buffer[info.offset], info.size);
+    }
+    // sort in chunks: LEB uses 7 bits for data per 8, so functions with
+    // index 0-127 take one bytes, and so forth. sort within each such chunk
+    size_t start = 0;
+    size_t end = 128; // not inclusive
+    while (start < numFunctions) {
+      end = std::min(end, numFunctions);
+      // how sort fast and not N^2?
+      // move on to next chunk
+      start = end;
+      end *= 128;
+    }
   }
+
+  // represents a profile of binary data, suitable for making fuzzy comparisons
+  // of similarity
+  struct Profile {
+    Profile(char* data, size_t size) {
+...
+    }
+  };
 };
 
 Pass *createReorderFunctionsPass() {
