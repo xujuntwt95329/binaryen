@@ -61,6 +61,9 @@ void WasmBinaryWriter::write() {
   if (sourceMap) {
     writeSourceMapEpilog();
   }
+
+  writeUserSections();
+
   finishUp();
 }
 
@@ -551,6 +554,17 @@ static void writeBase64VLQ(std::ostream& out, int32_t n) {
   }
 }
 
+void WasmBinaryWriter::writeUserSections() {
+  for (auto& section : wasm->userSections) {
+    auto start = startSection(0);
+    writeInlineString(section.name.c_str());
+    for (size_t i = 0; i < section.data.size(); i++) {
+      o << uint8_t(section.data[i]);
+    }
+    finishSection(start);
+  }
+}
+
 void WasmBinaryWriter::writeDebugLocation(size_t offset, const Function::DebugLocation& loc) {
   if (lastBytecodeOffset > 0) {
     *sourceMap << ",";
@@ -940,7 +954,10 @@ void WasmBinaryWriter::visitStore(Store *curr) {
 void WasmBinaryWriter::visitAtomicRMW(AtomicRMW *curr) {
   if (debug) std::cerr << "zz node: AtomicRMW" << std::endl;
   recurse(curr->ptr);
+  // stop if the rest isn't reachable anyhow
+  if (curr->ptr->type == unreachable) return;
   recurse(curr->value);
+  if (curr->value->type == unreachable) return;
 
   if (curr->type == unreachable) {
     // don't even emit it; we don't know the right type
@@ -991,8 +1008,12 @@ void WasmBinaryWriter::visitAtomicRMW(AtomicRMW *curr) {
 void WasmBinaryWriter::visitAtomicCmpxchg(AtomicCmpxchg *curr) {
   if (debug) std::cerr << "zz node: AtomicCmpxchg" << std::endl;
   recurse(curr->ptr);
+  // stop if the rest isn't reachable anyhow
+  if (curr->ptr->type == unreachable) return;
   recurse(curr->expected);
+  if (curr->expected->type == unreachable) return;
   recurse(curr->replacement);
+  if (curr->replacement->type == unreachable) return;
 
   if (curr->type == unreachable) {
     // don't even emit it; we don't know the right type
@@ -1027,13 +1048,25 @@ void WasmBinaryWriter::visitAtomicCmpxchg(AtomicCmpxchg *curr) {
 void WasmBinaryWriter::visitAtomicWait(AtomicWait *curr) {
   if (debug) std::cerr << "zz node: AtomicWait" << std::endl;
   recurse(curr->ptr);
+  // stop if the rest isn't reachable anyhow
+  if (curr->ptr->type == unreachable) return;
   recurse(curr->expected);
+  if (curr->expected->type == unreachable) return;
   recurse(curr->timeout);
+  if (curr->timeout->type == unreachable) return;
 
   o << int8_t(BinaryConsts::AtomicPrefix);
   switch (curr->expectedType) {
-    case i32: o << int8_t(BinaryConsts::I32AtomicWait); break;
-    case i64: o << int8_t(BinaryConsts::I64AtomicWait); break;
+    case i32: {
+      o << int8_t(BinaryConsts::I32AtomicWait);
+      emitMemoryAccess(4, 4, 0);
+      break;
+    }
+    case i64: {
+      o << int8_t(BinaryConsts::I64AtomicWait);
+      emitMemoryAccess(8, 8, 0);
+      break;
+    }
     default: WASM_UNREACHABLE();
   }
 }
@@ -1041,9 +1074,13 @@ void WasmBinaryWriter::visitAtomicWait(AtomicWait *curr) {
 void WasmBinaryWriter::visitAtomicWake(AtomicWake *curr) {
   if (debug) std::cerr << "zz node: AtomicWake" << std::endl;
   recurse(curr->ptr);
+  // stop if the rest isn't reachable anyhow
+  if (curr->ptr->type == unreachable) return;
   recurse(curr->wakeCount);
+  if (curr->wakeCount->type == unreachable) return;
 
   o << int8_t(BinaryConsts::AtomicPrefix) << int8_t(BinaryConsts::AtomicWake);
+  emitMemoryAccess(4, 4, 0);
 }
 
 void WasmBinaryWriter::visitConst(Const *curr) {
@@ -1626,9 +1663,9 @@ void WasmBinaryBuilder::readImports() {
       case ExternalKind::Global: {
         curr->globalType = getWasmType();
         auto globalMutable = getU32LEB();
-        if (globalMutable) {
-          throw ParseException("imported globals cannot be mutable");
-        }
+        // TODO: actually use the globalMutable flag. Currently mutable global
+        // imports is a future feature, to be implemented with thread support.
+        (void)globalMutable;
         break;
       }
       default: {
@@ -2541,7 +2578,7 @@ void WasmBinaryBuilder::visitSetGlobal(SetGlobal *curr) {
   curr->finalize();
 }
 
-void WasmBinaryBuilder::readMemoryAccess(Address& alignment, size_t bytes, Address& offset) {
+void WasmBinaryBuilder::readMemoryAccess(Address& alignment, Address& offset) {
   auto rawAlignment = getU32LEB();
   if (rawAlignment > 4) throw ParseException("Alignment must be of a reasonable size");
   alignment = Pow2(rawAlignment);
@@ -2585,7 +2622,7 @@ bool WasmBinaryBuilder::maybeVisitLoad(Expression*& out, uint8_t code, bool isAt
   }
 
   curr->isAtomic = isAtomic;
-  readMemoryAccess(curr->align, curr->bytes, curr->offset);
+  readMemoryAccess(curr->align, curr->offset);
   curr->ptr = popNonVoidExpression();
   curr->finalize();
   out = curr;
@@ -2622,7 +2659,7 @@ bool WasmBinaryBuilder::maybeVisitStore(Expression*& out, uint8_t code, bool isA
 
   curr->isAtomic = isAtomic;
   if (debug) std::cerr << "zz node: Store" << std::endl;
-  readMemoryAccess(curr->align, curr->bytes, curr->offset);
+  readMemoryAccess(curr->align, curr->offset);
   curr->value = popNonVoidExpression();
   curr->ptr = popNonVoidExpression();
   curr->finalize();
@@ -2665,7 +2702,7 @@ bool WasmBinaryBuilder::maybeVisitAtomicRMW(Expression*& out, uint8_t code) {
 
   if (debug) std::cerr << "zz node: AtomicRMW" << std::endl;
   Address readAlign;
-  readMemoryAccess(readAlign, curr->bytes, curr->offset);
+  readMemoryAccess(readAlign, curr->offset);
   if (readAlign != curr->bytes) throw ParseException("Align of AtomicRMW must match size");
   curr->value = popNonVoidExpression();
   curr->ptr = popNonVoidExpression();
@@ -2696,7 +2733,7 @@ bool WasmBinaryBuilder::maybeVisitAtomicCmpxchg(Expression*& out, uint8_t code) 
 
   if (debug) std::cerr << "zz node: AtomicCmpxchg" << std::endl;
   Address readAlign;
-  readMemoryAccess(readAlign, curr->bytes, curr->offset);
+  readMemoryAccess(readAlign, curr->offset);
   if (readAlign != curr->bytes) throw ParseException("Align of AtomicCpxchg must match size");
   curr->replacement = popNonVoidExpression();
   curr->expected = popNonVoidExpression();
@@ -2720,6 +2757,9 @@ bool WasmBinaryBuilder::maybeVisitAtomicWait(Expression*& out, uint8_t code) {
   curr->timeout = popNonVoidExpression();
   curr->expected = popNonVoidExpression();
   curr->ptr = popNonVoidExpression();
+  Address readAlign;
+  readMemoryAccess(readAlign, curr->offset);
+  if (readAlign != getWasmTypeSize(curr->expectedType)) throw ParseException("Align of AtomicWait must match size");
   curr->finalize();
   out = curr;
   return true;
@@ -2733,6 +2773,9 @@ bool WasmBinaryBuilder::maybeVisitAtomicWake(Expression*& out, uint8_t code) {
   curr->type = i32;
   curr->wakeCount = popNonVoidExpression();
   curr->ptr = popNonVoidExpression();
+  Address readAlign;
+  readMemoryAccess(readAlign, curr->offset);
+  if (readAlign != getWasmTypeSize(curr->type)) throw ParseException("Align of AtomicWake must match size");
   curr->finalize();
   out = curr;
   return true;
