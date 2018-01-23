@@ -54,6 +54,16 @@ private:
 };
 
 struct ReorderFunctions : public Pass {
+  enum {
+    // don't sort into chunks of this size: we sort the entire
+    // list and then assume chunks of this size are ok to leave
+    // as-is, which is generally true (transitivity) and much more
+    // efficient
+    SIMILARITY_SORT_CHUNK_SIZE = 128,
+    // we allow more then 256 hashes so that we look not just at individual bytes, but also larger windows
+    MAX_HASHES_PER_PROFILE = 1024
+  };
+
   void run(PassRunner* runner, Module* module) override {
     // note original indexes, to break ties
     std::unordered_map<Name, Index> originalIndexes;
@@ -112,22 +122,29 @@ struct ReorderFunctions : public Pass {
     size_t end = 128; // not inclusive
     while (start < numFunctions) {
       end = std::min(end, numFunctions);
-      // TODO this is N^2!
-      for (Index i = start; i < end - 1; i++) {
-        // find the most similar to the previous
-        if (i == 0) continue; // the very first can stay right there
-        auto& previousProfile = profiles[functions[i - 1]->name];
-        Index best = -1;
-        size_t bestDistance = -1;
-        for (Index j = i; j < end; j++) {
-          auto distance = previousProfile.distance(profiles[functions[j]->name]);
-          if (distance < bestDistance) {
-            best = j;
-            bestDistance = distance;
-          }
+      Index curr =  start;
+      while (start < end) {
+        // we sort all the functions compared to a baseline: the previous
+        // element if there is one, or the first
+        auto baseline = i == 0 ? 0 : i - 1;
+        auto& baselineProfile = profiles[functions[baseline]->name];
+        std::unordered_map<Name, size_t> distances; // to the baseline
+        for (auto i = curr; i < end; i++) {
+          auto name = functions[i]->name;
+          distances[name] = baselineProfile.distance(profiles[name]);
         }
-        assert(best != -1);
-        std::swap(functions[i], functions[best]);
+        std::sort(functions.begin() + start, functions.begin() + end, [&distances, &originalIndexes](
+          const std::unique_ptr<Function>& a,
+          const std::unique_ptr<Function>& b) -> bool {
+          if (distances[a->name] == distances[b->name]) {
+            return originalIndexes[a->name] < originalIndexes[b->name];
+          }
+          return distances[a->name] < distances[b->name];
+        });
+        // now that they are sorted, we can assume the first chunk are all similar
+        // to the baseline, and so also to themselves) and we can just leave them,
+        // and continue on to the next chunk
+        start += SIMILARITY_SORT_CHUNK_SIZE;
       }
       // move on to next chunk
       start = end;
@@ -138,10 +155,6 @@ struct ReorderFunctions : public Pass {
   // represents a profile of binary data, suitable for making fuzzy comparisons
   // of similarity
   struct Profile {
-    enum {
-      // we allow more then 256 hashes so that we look not just at individual bytes, but also larger windows
-      MAX_HASHES = 1024
-    };
     // the profile maps hashes of seen values or combinations with the amount of appearances of them
     std::unordered_map<uint32_t, size_t> hashCounts;
     Profile(char* data, size_t size) {
