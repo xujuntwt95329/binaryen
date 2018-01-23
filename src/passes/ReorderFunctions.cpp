@@ -111,7 +111,7 @@ struct ReorderFunctions : public Pass {
     WasmBinaryWriter writer(module, buffer);
     writer.write();
     // get a profile of each function, which we can then use to compare
-    std::unordered_map<Name, Index> profiles;
+    std::unordered_map<Name, Profile> profiles;
     for (Index i = 0; i < numFunctions; i++) {
       auto& info = writer.tableOfContents.functionBodies[i];
       profiles[functions[i]->name] = Profile(&buffer[info.offset], info.size);
@@ -122,14 +122,16 @@ struct ReorderFunctions : public Pass {
     size_t end = 128; // not inclusive
     while (start < numFunctions) {
       end = std::min(end, numFunctions);
-      Index curr =  start;
+      // process the elements from start to end in chunks. each time we sort
+      // the whole thing, then leave the first sorted chunk, and continue.
+      // TODO: this is still N^2 even if we did lower the constant factor a lot
       while (start < end) {
         // we sort all the functions compared to a baseline: the previous
         // element if there is one, or the first
-        auto baseline = i == 0 ? 0 : i - 1;
+        auto baseline = start == 0 ? 0 : start - 1;
         auto& baselineProfile = profiles[functions[baseline]->name];
         std::unordered_map<Name, size_t> distances; // to the baseline
-        for (auto i = curr; i < end; i++) {
+        for (auto i = start; i < end; i++) {
           auto name = functions[i]->name;
           distances[name] = baselineProfile.distance(profiles[name]);
         }
@@ -156,8 +158,10 @@ struct ReorderFunctions : public Pass {
   // of similarity
   struct Profile {
     // the profile maps hashes of seen values or combinations with the amount of appearances of them
-    std::unordered_map<uint32_t, size_t> hashCounts;
-    Profile(char* data, size_t size) {
+    typedef std::unordered_map<uint32_t, size_t> HashCounts;
+    HashCounts hashCounts;
+    Profile() {}
+    Profile(unsigned char* data, size_t size) {
       // very simple algorithm, just use sliding windows of sizes 1, 2, and 4
       uint32_t curr = 0;
       for (size_t i = 0; i < size; i++) {
@@ -168,20 +172,20 @@ struct ReorderFunctions : public Pass {
         if (i > 2) hashCounts[hash(curr)]++;
       }
       // trim: ignore the long tail, leave just the popular ones
-      if (hashCounts.size() > MAX_HASHES) {
+      if (hashCounts.size() > MAX_HASHES_PER_PROFILE) {
         std::vector<size_t> keys;
         for (auto& pair : hashCounts) {
           keys.push_back(pair.first);
         }
-        std::sort(keys.begin(), keys.end(), [&hashCounts](const size_t a, const size_t b) -> bool {
-          auto diff = hashCounts[a->name] == hashCounts[b->name];
+        std::sort(keys.begin(), keys.end(), [this](const size_t a, const size_t b) -> bool {
+          auto diff = hashCounts[a] - hashCounts[b];
           if (diff == 0) {
             return a < b;
           }
           return diff > 0;
         });
-        auto trimmed;
-        for (size_t i = 0; i < MAX_HASHES; i++) {
+        HashCounts trimmed;
+        for (size_t i = 0; i < MAX_HASHES_PER_PROFILE; i++) {
           auto key = keys[i];
           trimmed[key] = hashCounts[key];
         }
