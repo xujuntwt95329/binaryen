@@ -188,6 +188,9 @@ void PassRunner::addDefaultGlobalOptimizationPostPasses() {
   }
   add("duplicate-function-elimination"); // optimizations show more functions as duplicate
   add("remove-unused-module-elements");
+  if (options.shrinkLevel >= 1) {
+    add("reorder-functions");
+  }
   add("memory-packing");
 }
 

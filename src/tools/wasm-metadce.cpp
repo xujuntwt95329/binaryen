@@ -290,9 +290,8 @@ public:
       wasm.removeExport(name);
     }
     // Now they are gone, standard optimization passes can do the rest!
-    PassRunner passRunner(&wasm);
-    passRunner.add("remove-unused-module-elements");
-    passRunner.add("reorder-functions"); // removing functions may alter the optimum order, as # of calls can change
+    PassRunner passRunner(&wasm, PassOptions::getWithDefaultOptimizationOptions());
+    passRunner.addDefaultGlobalOptimizationPostPasses();
     passRunner.run();
   }
 
