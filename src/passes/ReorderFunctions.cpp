@@ -59,6 +59,7 @@ struct ReorderFunctions : public Pass {
     // list and then assume chunks of this size are ok to leave
     // as-is, which is generally true (transitivity) and much more
     // efficient
+    // FIXME: really this should be function body sizes?
     SIMILARITY_SORT_CHUNK_SIZE = 128,
     // we allow more then 256 hashes so that we look not just at individual bytes, but also larger windows
     MAX_HASHES_PER_PROFILE = 1024
