@@ -181,14 +181,11 @@ private:
   // so it's not identical
   int xorFactor = 0;
 
+  // a set of values ready for use in make*()
+  std::map<WasmType, std::vector<Expression*>> readyValues;
+
   // read the input and prepare to run
   void readData(std::vector<char> input) {
-    readyValues.clear();
-    readyValues[none];
-    readyValues[i32];
-    readyValues[i64];
-    readyValues[f32];
-    readyValues[f64];
     bytes.swap(input);
     pos = 0;
     finishedInput = false;
@@ -196,6 +193,13 @@ private:
     if (bytes.size() == 0) {
       bytes.push_back(0);
     }
+    // ensure the readyValues map has entries for the types we need
+    readyValues.clear();
+    readyValues[none];
+    readyValues[i32];
+    readyValues[i64];
+    readyValues[f32];
+    readyValues[f64];
   }
 
   int8_t get() {
@@ -456,15 +460,8 @@ private:
     return std::string("label$") + std::to_string(labelIndex++);
   }
 
-  // always call the toplevel make(type) command, not the internal specific ones
-
-  int nesting = 0;
-
-  // a set of values ready for use in make*()
-  std::map<WasmType, std::vector<Expression*>> readyValues;
-
   Expression* getReadyValue(WasmType type) {
-    if (!readyValues[type].empty()) {
+    if (!readyValues[type].empty() && oneIn(2)) {
       auto ret = readyValues[type].back();
       readyValues[type].pop_back();
       return ret;
@@ -472,9 +469,23 @@ private:
     return nullptr;
   }
 
-  void addReadyValue(Expression* expr) {
+  Expression* addReadyValue(Expression* expr) {
     readyValues[expr->type].push_back(expr);
+    return expr;
   }
+
+  void removeReadyValues(std::unordered_set<Expression*>& exprs) {
+    for (auto& pair : readyValues) {
+      auto& values = pair.second;
+      values.erase(std::remove_if(values.begin(), values.end(), [&](Expression* curr) {
+        return exprs.count(curr) > 0;
+      }), values.end());
+    }
+  }
+
+  // always call the toplevel make(type) command, not the internal specific ones
+
+  int nesting = 0;
 
   Expression* make(WasmType type) {
     auto* ready = getReadyValue(type);
@@ -673,16 +684,28 @@ private:
       }
       std::vector<Expression*> list;
       list.push_back(makeMaybeBlock(none)); // primary contents
-      // if we have loop vars, make some values for them to use
-      for (Index i = 0; i < numLoopVars; i++) {
-        addReadyValue(make(func->getLocalType(loopVars[i])));
+      // if we have loop vars, make some gets for them to use
+      std::unordered_set<Expression*> added;
+      for (auto index : loopVars) {
+        for (Index j = 0; j < 2; j++) {
+          added.insert(addReadyValue(
+            builder.makeGetLocal(index, func->getLocalType(index))
+          ));
+        }
       }
+      // try to use them
       for (Index i = 0; i < numLoopVars; i++) {
         list.push_back(make(none));
       }
-// must claer the  ready values - they can't be used later in another place!
       list.push_back(builder.makeBreak(ret->name, nullptr, makeCondition())); // possible branch back
+      // increment the loop vars
+      for (auto index : loopVars) {
+        if (oneIn(2)) {
+          list.push_back(builder.makeSetLocal(index, make(func->getLocalType(index))));
+        }
+      }
       list.push_back(make(type)); // final element, so we have the right type
+      removeReadyValues(added); // the ready values make sense only for this scope
       ret->body = builder.makeBlock(list);
     }
     breakableStack.pop_back();
@@ -697,8 +720,7 @@ private:
     if (numLoopVars > 0) {
       // initialize the loop vars
       auto* outer = builder.makeBlock();
-      for (Index i = 0; i < numLoopVars; i++) {
-        auto index = loopVars[i];
+      for (auto index : loopVars) {
         outer->list.push_back(builder.makeSetLocal(index, make(func->getLocalType(index))));
       }
       outer->list.push_back(ret);
