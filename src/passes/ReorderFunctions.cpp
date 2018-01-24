@@ -60,7 +60,7 @@ struct ReorderFunctions : public Pass {
     // as-is, which is generally true (transitivity) and much more
     // efficient
     // FIXME: really this should be function body sizes?
-    SIMILARITY_SORT_CHUNK_SIZE = 128,
+    SIMILARITY_SORT_CHUNK_SIZE = 1,
     // we allow more then 256 hashes so that we look not just at individual bytes, but also larger windows
     MAX_HASHES_PER_PROFILE = 1024
   };
@@ -106,6 +106,7 @@ struct ReorderFunctions : public Pass {
       }
       return counts[a->name] > counts[b->name];
     });
+if (getenv("OLD")) return;
     // secondarily, sort by similarity, but without changing LEB sizes
     // write out the binary so we can see function contents
     BufferWithRandomAccess buffer;
@@ -115,6 +116,7 @@ struct ReorderFunctions : public Pass {
     std::unordered_map<Name, Profile> profiles;
     for (Index i = 0; i < numFunctions; i++) {
       auto& info = writer.tableOfContents.functionBodies[i];
+std::cout << "profile " << i << " / " << numFunctions << '\n';
       profiles[functions[i]->name] = Profile(&buffer[info.offset], info.size);
     }
     // sort in chunks: LEB uses 7 bits for data per 8, so functions with
@@ -123,10 +125,12 @@ struct ReorderFunctions : public Pass {
     size_t end = 128; // not inclusive
     while (start < numFunctions) {
       end = std::min(end, numFunctions);
+std::cout << "work from " << start << " to " << end << " / " << numFunctions << '\n';
       // process the elements from start to end in chunks. each time we sort
       // the whole thing, then leave the first sorted chunk, and continue.
       // TODO: this is still N^2 even if we did lower the constant factor a lot
       while (start < end) {
+std::cout << "piece of work from " << start << " to " << end << " / " << numFunctions << '\n';
         // we sort all the functions compared to a baseline: the previous
         // element if there is one, or the first
         auto baseline = start == 0 ? 0 : start - 1;
@@ -166,7 +170,7 @@ struct ReorderFunctions : public Pass {
       // very simple algorithm, just use sliding windows of sizes 1, 2, and 4
       uint32_t curr = 0;
       for (size_t i = 0; i < size; i++) {
-        curr = (curr << 24) | *data;
+        curr = (curr << 8) | *data;
         data++;
         hashCounts[hash(curr & 0xff)]++;
         if (i > 0) hashCounts[hash(curr & 0xffff)]++;
@@ -179,7 +183,7 @@ struct ReorderFunctions : public Pass {
           keys.push_back(pair.first);
         }
         std::sort(keys.begin(), keys.end(), [this](const size_t a, const size_t b) -> bool {
-          auto diff = hashCounts[a] - hashCounts[b];
+          ssize_t diff = hashCounts[a] - hashCounts[b];
           if (diff == 0) {
             return a < b;
           }
