@@ -61,13 +61,30 @@ struct ReorderFunctions : public Pass {
   };
 
   void run(PassRunner* runner, Module* module) override {
+    auto& functions = module->functions;
+    auto numFunctions = functions.size();
     // we can't move imports, but need to know how many there are
     ModuleUtils::BinaryIndexes indexes(*module);
     ssize_t firstNonImportedFunctionIndex = indexes.firstNonImportedFunctionIndex;
+    // calculate the ranges within which the LEB size is the same
+    std::vector<std::pair<Index, Index>> ranges;
+    {
+      // LEB uses 7 bits for data per 8, so functions with
+      // index 0-127 take one bytes, and so forth. sort within each such chunk
+      ssize_t absoluteStart = 0;
+      ssize_t absoluteEnd = 128; // not inclusive
+      while (1) {
+        size_t start = std::max(absoluteStart - firstNonImportedFunctionIndex, ssize_t(0));
+        size_t end = std::max(absoluteEnd - firstNonImportedFunctionIndex, ssize_t(0));
+        end = std::min(end, numFunctions);
+        if (start >= numFunctions) break;
+        ranges.emplace_back(start, end);
+        absoluteStart = absoluteEnd;
+        absoluteEnd *= 128;
+      }
+    }
     // note original indexes, to break ties
     std::unordered_map<Name, Index> originalIndexes;
-    auto& functions = module->functions;
-    auto numFunctions = functions.size();
     for (Index i = 0; i < numFunctions; i++) {
       originalIndexes[functions[i]->name] = i;
     }
@@ -127,25 +144,17 @@ if (getenv("MODE")[0] == '1') {
     WasmBinaryWriter writer(module, buffer);
     writer.write();
     // get a profile of each function, which we can then use to compare
+    // TODO: parallelize
     std::unordered_map<Name, Profile> profiles;
     for (Index i = 0; i < numFunctions; i++) {
       auto& info = writer.tableOfContents.functionBodies[i];
 std::cout << "profile " << i << " / " << numFunctions << '\n';
       profiles[functions[i]->name] = Profile(&buffer[info.offset], info.size);
     }
-    // sort in chunks: LEB uses 7 bits for data per 8, so functions with
-    // index 0-127 take one bytes, and so forth. sort within each such chunk
-    // absoluteX are the absolute function space indexes, that include the
-    // imports (which we can't move, but need to take into account here).
-    // start/end without absolute are indexes in the list of functions
-    // (which has no imports, just implemented functions)
-    ssize_t absoluteStart = 0;
-    ssize_t absoluteEnd = 128; // not inclusive
-    while (1) {
-      size_t start = std::max(absoluteStart - firstNonImportedFunctionIndex, ssize_t(0));
-      size_t end = std::max(absoluteEnd - firstNonImportedFunctionIndex, ssize_t(0));
-      end = std::min(end, numFunctions);
-      if (start >= numFunctions) break;
+    // work within each range where the LEB size is identical, don't cross them
+    for (auto& range : ranges) {
+      auto start = range.first;
+      auto end = range.second;
 std::cout << "work from " << start << " to " << end << " / " << numFunctions << '\n';
       // process the elements from start to end in chunks. each time we sort
       // the whole thing, then leave the first sorted chunk, and continue.
@@ -174,9 +183,6 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
         // and continue on to the next chunk
         start += SIMILARITY_SORT_CHUNK_SIZE;
       }
-      // move on to next chunk
-      absoluteStart = absoluteEnd;
-      absoluteEnd *= 128;
     }
   }
 
