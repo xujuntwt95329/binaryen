@@ -33,36 +33,30 @@
 
 namespace wasm {
 
-typedef std::unordered_map<Name, std::atomic<Index>> NameCountMap;
-
-struct CallCountScanner : public WalkerPass<PostWalker<CallCountScanner>> {
-  bool isFunctionParallel() override { return true; }
-
-  CallCountScanner(NameCountMap* counts) : counts(counts) {}
-
-  CallCountScanner* create() override {
-    return new CallCountScanner(counts);
-  }
-
-  void visitCall(Call* curr) {
-    assert(counts->count(curr->target) > 0); // can't add a new element in parallel
-    (*counts)[curr->target]++;
-  }
-
-private:
-  NameCountMap* counts;
-};
-
 struct ReorderFunctions : public Pass {
   enum {
-    // don't sort into chunks of this size: we sort the entire
-    // list and then assume chunks of this size are ok to leave
-    // as-is, which is generally true (transitivity) and much more
-    // efficient
-    // FIXME: really this should be function body sizes?
-    SIMILARITY_SORT_CHUNK_SIZE = 1,
     // we allow more then 256 hashes so that we look not just at individual bytes, but also larger windows
-    MAX_HASHES_PER_PROFILE = 1024
+    MAX_HASHES_PER_PROFILE = 512
+  };
+
+  typedef std::unordered_map<Name, std::atomic<Index>> NameCountMap;
+
+  struct CallCountScanner : public WalkerPass<PostWalker<CallCountScanner>> {
+    bool isFunctionParallel() override { return true; }
+
+    CallCountScanner(NameCountMap* counts) : counts(counts) {}
+
+    CallCountScanner* create() override {
+      return new CallCountScanner(counts);
+    }
+
+    void visitCall(Call* curr) {
+      assert(counts->count(curr->target) > 0); // can't add a new element in parallel
+      (*counts)[curr->target]++;
+    }
+
+  private:
+    NameCountMap* counts;
   };
 
   void run(PassRunner* runner, Module* module) override {
@@ -106,7 +100,23 @@ struct ReorderFunctions : public Pass {
       }
       return counts[a->name] > counts[b->name];
     });
-if (getenv("OLD")) return;
+// 0 is the old way
+// 1 is fast similarity checks
+// 2 is do all the hard work
+if (getenv("MODE")[0] == '0') return;
+    // don't sort into chunks of this size: we sort the entire
+    // list and then assume chunks of this size are ok to leave
+    // as-is, which is generally true (transitivity) and much more
+    // efficient
+    // FIXME: really this should be function body sizes?
+    //        or similarity measures?
+    size_t SIMILARITY_SORT_CHUNK_SIZE;
+if (getenv("MODE")[0] == '1') {
+  SIMILARITY_SORT_CHUNK_SIZE = 100;
+} else {
+  SIMILARITY_SORT_CHUNK_SIZE = 1; // the most work
+}
+
     // secondarily, sort by similarity, but without changing LEB sizes
     // write out the binary so we can see function contents
     BufferWithRandomAccess buffer;
@@ -173,8 +183,8 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
         curr = (curr << 8) | *data;
         data++;
         hashCounts[hash(curr & 0xff)]++;
-        if (i > 0) hashCounts[hash(curr & 0xffff)]++;
-        if (i > 2) hashCounts[hash(curr)]++;
+        //if (i > 0) hashCounts[hash(curr & 0xffff)]++; // this line is necessary for non-gzip size to be ok. something is wrong
+        //if (i > 2) hashCounts[hash(curr)]++;
       }
       // trim: ignore the long tail, leave just the popular ones
       if (hashCounts.size() > MAX_HASHES_PER_PROFILE) {
