@@ -29,6 +29,7 @@
 #include <wasm.h>
 #include <pass.h>
 #include <wasm-binary.h>
+#include <ir/module-utils.h>
 #include <support/hash.h>
 
 namespace wasm {
@@ -60,6 +61,9 @@ struct ReorderFunctions : public Pass {
   };
 
   void run(PassRunner* runner, Module* module) override {
+    // we can't move imports, but need to know how many there are
+    ModuleUtils::BinaryIndexes indexes(*module);
+    ssize_t firstNonImportedFunctionIndex = indexes.firstNonImportedFunctionIndex;
     // note original indexes, to break ties
     std::unordered_map<Name, Index> originalIndexes;
     auto& functions = module->functions;
@@ -131,10 +135,17 @@ std::cout << "profile " << i << " / " << numFunctions << '\n';
     }
     // sort in chunks: LEB uses 7 bits for data per 8, so functions with
     // index 0-127 take one bytes, and so forth. sort within each such chunk
-    size_t start = 0;
-    size_t end = 128; // not inclusive
-    while (start < numFunctions) {
+    // absoluteX are the absolute function space indexes, that include the
+    // imports (which we can't move, but need to take into account here).
+    // start/end without absolute are indexes in the list of functions
+    // (which has no imports, just implemented functions)
+    ssize_t absoluteStart = 0;
+    ssize_t absoluteEnd = 128; // not inclusive
+    while (1) {
+      size_t start = std::max(absoluteStart - firstNonImportedFunctionIndex, ssize_t(0));
+      size_t end = std::max(absoluteEnd - firstNonImportedFunctionIndex, ssize_t(0));
       end = std::min(end, numFunctions);
+      if (start >= numFunctions) break;
 std::cout << "work from " << start << " to " << end << " / " << numFunctions << '\n';
       // process the elements from start to end in chunks. each time we sort
       // the whole thing, then leave the first sorted chunk, and continue.
@@ -164,8 +175,8 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
         start += SIMILARITY_SORT_CHUNK_SIZE;
       }
       // move on to next chunk
-      start = end;
-      end *= 128;
+      absoluteStart = absoluteEnd;
+      absoluteEnd *= 128;
     }
   }
 

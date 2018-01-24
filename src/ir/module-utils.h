@@ -28,6 +28,8 @@ namespace ModuleUtils {
 struct BinaryIndexes {
   std::unordered_map<Name, Index> functionIndexes;
   std::unordered_map<Name, Index> globalIndexes;
+  Index firstNonImportedFunctionIndex,
+        firstNonImportedGlobalIndex;
 
   BinaryIndexes(Module& wasm) {
     for (Index i = 0; i < wasm.imports.size(); i++) {
@@ -40,6 +42,8 @@ struct BinaryIndexes {
         globalIndexes[import->name] = index;
       }
     }
+    firstNonImportedFunctionIndex = functionIndexes.size();
+    firstNonImportedGlobalIndex = globalIndexes.size();
     for (Index i = 0; i < wasm.functions.size(); i++) {
       auto index = functionIndexes.size();
       functionIndexes[wasm.functions[i]->name] = index;
