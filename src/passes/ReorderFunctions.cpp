@@ -145,7 +145,7 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
         // element if there is one, or the first
         auto baseline = start == 0 ? 0 : start - 1;
         auto& baselineProfile = profiles[functions[baseline]->name];
-        std::unordered_map<Name, size_t> distances; // to the baseline
+        std::unordered_map<Name, double> distances; // to the baseline
         for (auto i = start; i < end; i++) {
           auto name = functions[i]->name;
           distances[name] = baselineProfile.distance(profiles[name]);
@@ -175,6 +175,8 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
     // the profile maps hashes of seen values or combinations with the amount of appearances of them
     typedef std::unordered_map<uint32_t, size_t> HashCounts;
     HashCounts hashCounts;
+    size_t total = 0;
+
     Profile() {}
     Profile(unsigned char* data, size_t size) {
       // very simple algorithm, just use sliding windows of sizes 1, 2, and 4
@@ -183,8 +185,11 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
         curr = (curr << 8) | *data;
         data++;
         hashCounts[hash(curr & 0xff)]++;
-        //if (i > 0) hashCounts[hash(curr & 0xffff)]++; // this line is necessary for non-gzip size to be ok. something is wrong
+        total++;
+        if (i > 0) hashCounts[hash(curr & 0xffff)]++; // this line is necessary for non-gzip size to be ok. something is wrong
+        total++;
         //if (i > 2) hashCounts[hash(curr)]++;
+        //total++;
       }
       // trim: ignore the long tail, leave just the popular ones
       if (hashCounts.size() > MAX_HASHES_PER_PROFILE) {
@@ -212,25 +217,27 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
       return rehash(x, 0);
     }
 
-    size_t distance(const Profile& other) {
-      size_t ret = 0;
+    double distance(const Profile& other) {
+      size_t sum = 0;
       for (auto& pair : hashCounts) {
         auto value = pair.first;
         auto iter = other.hashCounts.find(value);
         if (iter != other.hashCounts.end()) {
-          ret += std::abs(pair.second - iter->second);
+          sum += std::abs(pair.second - iter->second);
         } else {
-          ret += pair.second;
+          sum += pair.second;
         }
       }
       for (auto& pair : other.hashCounts) {
         auto value = pair.first;
         auto iter = hashCounts.find(value);
         if (iter == hashCounts.end()) {
-          ret += pair.second;
+          sum += pair.second;
         }
       }
-      return ret;
+      auto normalized = double(sum) / (total + other.total);
+      assert(normalized >= 0 && normalized <= 1);
+      return normalized;
     }
   };
 };
