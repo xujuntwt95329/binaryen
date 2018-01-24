@@ -88,6 +88,7 @@ struct ReorderFunctions : public Pass {
     for (Index i = 0; i < numFunctions; i++) {
       originalIndexes[functions[i]->name] = i;
     }
+    // find use counts
     NameCountMap counts;
     // fill in info, as we operate on it in parallel (each function to its own entry)
     for (auto& func : functions) {
@@ -112,15 +113,41 @@ struct ReorderFunctions : public Pass {
         counts[curr]++;
       }
     }
-    // sort by uses, break ties with original order
-    std::sort(functions.begin(), functions.end(), [&counts, &originalIndexes](
-      const std::unique_ptr<Function>& a,
-      const std::unique_ptr<Function>& b) -> bool {
-      if (counts[a->name] == counts[b->name]) {
-        return originalIndexes[a->name] < originalIndexes[b->name];
+    // sort them all, to find which range each belongs to
+    {
+      std::vector<Name> sorted;
+      for (auto& func : functions) {
+        sorted.push_back(func->name);
       }
-      return counts[a->name] > counts[b->name];
-    });
+      // sort by uses, break ties with original order
+      std::sort(sorted.begin(), sorted.end(), [&counts, &originalIndexes](
+        const Name a,
+        const Name b) -> bool {
+        if (counts[a] == counts[b]) {
+          return originalIndexes[a] < originalIndexes[b];
+        }
+        return counts[a] > counts[b];
+      });
+      // note the proper range for each one
+      std::unordered_map<Name, Index> properRange;
+      for (Index rangeIndex = 0; rangeIndex < ranges.size(); rangeIndex++) {
+        auto& range = ranges[rangeIndex];
+        auto start = range.first;
+        auto end = range.second;
+        for (auto i = start; i < end; i++) {
+          properRange[sorted[i]] = rangeIndex;
+        }
+      }
+      // sort into ranges, keeping original sort within range
+      std::sort(functions.begin(), functions.end(), [&originalIndexes, &properRange](
+        const std::unique_ptr<Function>& a,
+        const std::unique_ptr<Function>& b) -> bool {
+        if (properRange[a->name] == properRange[b->name]) {
+          return originalIndexes[a->name] < originalIndexes[b->name];
+        }
+        return properRange[a->name] < properRange[b->name];
+      });
+    }
 // 0 is the old way
 // 1 is fast similarity checks
 // 2 is do all the hard work
