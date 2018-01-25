@@ -159,10 +159,13 @@ if (getenv("MODE")[0] == '0') return;
     // FIXME: really this should be function body sizes?
     //        or similarity measures?
     size_t SIMILARITY_SORT_CHUNK_SIZE;
+double SIMILAR_SIMILARITY;
 if (getenv("MODE")[0] == '1') {
   SIMILARITY_SORT_CHUNK_SIZE = 100;
+  SIMILAR_SIMILARITY = 0.25;
 } else {
   SIMILARITY_SORT_CHUNK_SIZE = 1; // the most work
+  SIMILAR_SIMILARITY = 0.05;
 }
 
     // secondarily, sort by similarity, but without changing LEB sizes
@@ -175,19 +178,19 @@ if (getenv("MODE")[0] == '1') {
     std::unordered_map<Name, Profile> profiles;
     for (Index i = 0; i < numFunctions; i++) {
       auto& info = writer.tableOfContents.functionBodies[i];
-std::cout << "profile " << i << " / " << numFunctions << '\n';
+//std::cout << "profile " << i << " / " << numFunctions << '\n';
       profiles[functions[i]->name] = Profile(&buffer[info.offset], info.size);
     }
     // work within each range where the LEB size is identical, don't cross them
     for (auto& range : ranges) {
       auto start = range.first;
       auto end = range.second;
-std::cout << "work from " << start << " to " << end << " / " << numFunctions << '\n';
+//std::cout << "work from " << start << " to " << end << " / " << numFunctions << '\n';
       // process the elements from start to end in chunks. each time we sort
       // the whole thing, then leave the first sorted chunk, and continue.
       // TODO: this is still N^2 even if we did lower the constant factor a lot
       while (start < end) {
-std::cout << "piece of work from " << start << " to " << end << " / " << numFunctions << '\n';
+//std::cout << "piece of work from " << start << " to " << end << " / " << numFunctions << '\n';
         // we sort all the functions compared to a baseline: the previous
         // element if there is one, or the first
         auto baseline = start == 0 ? 0 : start - 1;
@@ -205,10 +208,19 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
           }
           return distances[a->name] < distances[b->name];
         });
-        // now that they are sorted, we can assume the first chunk are all similar
-        // to the baseline, and so also to themselves) and we can just leave them,
-        // and continue on to the next chunk
-        start += SIMILARITY_SORT_CHUNK_SIZE;
+//std::cout << "distance: " << distances[functions[start]->name] << "\n";
+// now that they are sorted, we can assume the first chunk are all similar
+// to the baseline, and so also to themselves) and we can just leave them,
+// and continue on to the next chunk
+        // the first is now in the right place
+        start++;
+        // keep going while the distance to the rest is fairly small, by
+        // the triangle inequality they are similar to each other too
+        while (start < end && distances[functions[start]->name] < SIMILAR_SIMILARITY) {
+          start++;
+        }
+if (0) SIMILARITY_SORT_CHUNK_SIZE = SIMILARITY_SORT_CHUNK_SIZE;
+        //start += SIMILARITY_SORT_CHUNK_SIZE;
       }
     }
   }
