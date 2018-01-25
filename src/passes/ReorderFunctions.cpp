@@ -37,7 +37,7 @@ namespace wasm {
 struct ReorderFunctions : public Pass {
   enum {
     // we allow more then 256 hashes so that we look not just at individual bytes, but also larger windows
-    MAX_HASHES_PER_PROFILE = 512
+    MAX_HASHES_PER_PROFILE = 768
   };
 
   typedef std::unordered_map<Name, std::atomic<Index>> NameCountMap;
@@ -217,23 +217,25 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
   // of similarity
   struct Profile {
     // the profile maps hashes of seen values or combinations with the amount of appearances of them
-    typedef std::unordered_map<uint32_t, size_t> HashCounts;
+    typedef std::unordered_map<uint32_t, ssize_t> HashCounts;
     HashCounts hashCounts;
     size_t total = 0;
 
     Profile() {}
     Profile(unsigned char* data, size_t size) {
       // very simple algorithm, just use sliding windows of sizes 1, 2, and 4
+      total = 0;
       uint32_t curr = 0;
       for (size_t i = 0; i < size; i++) {
         curr = (curr << 8) | *data;
         data++;
-        hashCounts[hash(curr & 0xff)]++;
-        total++;
-        if (i > 0) hashCounts[hash(curr & 0xffff)]++; // this line is necessary for non-gzip size to be ok. something is wrong
-        total++;
-        //if (i > 2) hashCounts[hash(curr)]++;
-        //total++;
+        hashCounts[hash(curr & 0xff)] += 2;
+        total += 2;
+        if (i > 0) {
+          hashCounts[hash(curr & 0xffff)] += 1; // this line is necessary for non-gzip size to be ok. something is wrong
+          total += 1;
+        }
+        // TODO: also 4?
       }
       // trim: ignore the long tail, leave just the popular ones
       if (hashCounts.size() > MAX_HASHES_PER_PROFILE) {
@@ -249,9 +251,12 @@ std::cout << "piece of work from " << start << " to " << end << " / " << numFunc
           return diff > 0;
         });
         HashCounts trimmed;
+        total = 0;
         for (size_t i = 0; i < MAX_HASHES_PER_PROFILE; i++) {
           auto key = keys[i];
-          trimmed[key] = hashCounts[key];
+          auto value = hashCounts[key];
+          trimmed[key] = value;
+          total += value;
         }
         trimmed.swap(hashCounts);
       }
