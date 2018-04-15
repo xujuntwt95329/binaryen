@@ -266,7 +266,7 @@ void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector
 // the original order should be kept.
 std::vector<Index> adjustOrderByPriorities(std::vector<Index>& baseline, std::vector<Index>& priorities) {
   std::vector<Index> ret = baseline;
-  std::vector<Index> reversed = makeReversed(baseline);
+  std::vector<Index> reversed = Permutation::makeReversed(baseline);
   std::sort(ret.begin(), ret.end(), [&priorities, &reversed](Index x, Index y) {
     return priorities[x] > priorities[y] || (priorities[x] == priorities[y] && reversed[x] < reversed[y]);
   });
@@ -281,7 +281,7 @@ void CoalesceLocals::pickIndices(std::vector<Index>& indices) {
   }
   if (getFunction()->getNumVars() <= 1) {
     // nothing to think about here, since we can't reorder params
-    indices = makeIdentity(numLocals);
+    indices = Permutation::makeIdentity(numLocals);
     return;
   }
   // take into account total copies. but we must keep params in place, so give them max priority
@@ -292,14 +292,14 @@ void CoalesceLocals::pickIndices(std::vector<Index>& indices) {
   }
   // first try the natural order. this is less arbitrary than it seems, as the program
   // may have a natural order of locals inherent in it.
-  auto order = makeIdentity(numLocals);
+  auto order = Permutation::makeIdentity(numLocals);
   order = adjustOrderByPriorities(order, adjustedTotalCopies);
   Index removedCopies;
   pickIndicesFromOrder(order, indices, removedCopies);
   auto maxIndex = *std::max_element(indices.begin(), indices.end());
   // next try the reverse order. this both gives us another chance at something good,
   // and also the very naturalness of the simple order may be quite suboptimal
-  setIdentity(order);
+  Permutation::setIdentity(order);
   for (Index i = numParams; i < numLocals; i++) {
     order[i] = numParams + numLocals - 1 - i;
   }

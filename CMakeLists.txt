@@ -190,6 +190,16 @@ SET_PROPERTY(TARGET wasm-opt PROPERTY CXX_STANDARD 11)
 SET_PROPERTY(TARGET wasm-opt PROPERTY CXX_STANDARD_REQUIRED ON)
 INSTALL(TARGETS wasm-opt DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+SET(wasm-analyze_SOURCES
+  src/tools/wasm-analyze.cpp
+)
+ADD_EXECUTABLE(wasm-analyze
+               ${wasm-analyze_SOURCES})
+TARGET_LINK_LIBRARIES(wasm-analyze wasm asmjs emscripten-optimizer passes ir cfg support wasm)
+SET_PROPERTY(TARGET wasm-analyze PROPERTY CXX_STANDARD 11)
+SET_PROPERTY(TARGET wasm-analyze PROPERTY CXX_STANDARD_REQUIRED ON)
+INSTALL(TARGETS wasm-analyze DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 SET(wasm-merge_SOURCES
   src/tools/wasm-merge.cpp
 )

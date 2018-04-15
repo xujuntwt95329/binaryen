@@ -23,6 +23,8 @@
 
 namespace wasm {
 
+namespace Permutation {
+
 inline std::vector<Index> makeIdentity(Index num) {
   std::vector<Index> ret;
   ret.resize(num);
@@ -49,6 +51,33 @@ inline std::vector<Index> makeReversed(std::vector<Index>& original) {
   }
   return ret;
 }
+
+// return a list of all permutations.
+inline std::vector<std::vector<Index>> makeAllPermutations(Index size) {
+  std::vector<std::vector<Index>> ret;
+  std::vector<Index> curr;
+  curr.resize(size);
+  for (auto& x : curr) x = 0;
+  while (1) {
+    std::set<Index> set;
+    for (auto x : curr) set.insert(x);
+    if (set.size() == size) {
+      ret.push_back(curr); // this is indeed a permutation
+    }
+    // advance to the next permutation in order
+    Index toBump = size - 1;
+    while (1) {
+      curr[toBump]++;
+      if (curr[toBump] < size) break;
+      // an overflow
+      if (toBump == 0) return ret; // all done
+      curr[toBump] = 0;
+      toBump--;
+    }
+  }
+}
+
+} // namespace Permutation
 
 } // namespace wasm
 
