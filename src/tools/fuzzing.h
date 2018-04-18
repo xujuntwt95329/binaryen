@@ -1000,13 +1000,14 @@ private:
       case 1: {
         // small range
         int64_t small;
-        switch (upTo(6)) {
-          case 0: small = int8_t(get()); break;
-          case 1: small = uint8_t(get()); break;
-          case 2: small = int16_t(get16()); break;
-          case 3: small = uint16_t(get16()); break;
-          case 4: small = int32_t(get32()); break;
-          case 5: small = uint32_t(get32()); break;
+        switch (upTo(7)) {
+          case 0: small = (get() & 63) - 31; // tiny values, helpful for bit indexes etc.
+          case 1: small = int8_t(get()); break;
+          case 2: small = uint8_t(get()); break;
+          case 3: small = int16_t(get16()); break;
+          case 4: small = uint16_t(get16()); break;
+          case 5: small = int32_t(get32()); break;
+          case 6: small = uint32_t(get32()); break;
           default: WASM_UNREACHABLE();
         }
         switch (type) {
