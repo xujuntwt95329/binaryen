@@ -1001,7 +1001,7 @@ private:
         // small range
         int64_t small;
         switch (upTo(7)) {
-          case 0: small = (get() & 63) - 31; // tiny values, helpful for bit indexes etc.
+          case 0: small = (get() & 63) - 31; break; // tiny values, helpful for bit indexes etc.
           case 1: small = int8_t(get()); break;
           case 2: small = uint8_t(get()); break;
           case 3: small = int16_t(get16()); break;
