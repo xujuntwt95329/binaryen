@@ -50,6 +50,7 @@
 #include <wasm-builder.h>
 #include <wasm-traversal.h>
 #include <pass.h>
+#include <ir/branch-utils.h>
 #include <ir/count.h>
 #include <ir/effects.h>
 #include "ir/equivalent_sets.h"
@@ -329,12 +330,36 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
   std::vector<Expression**> loops;
 
   void optimizeBlockReturn(Block* block) {
-    if (!block->name.is() || unoptimizableBlocks.count(block->name) > 0) {
+    if (block->name.is() && unoptimizableBlocks.count(block->name) > 0) {
       return;
     }
-    auto breaks = std::move(blockBreaks[block->name]);
-    blockBreaks.erase(block->name);
-    if (breaks.size() == 0) return; // block has no branches TODO we might optimize trivial stuff here too
+    auto iter = blockBreaks.end();
+    std::vector<BlockBreak> breaks;
+    if (block->name.is()) {
+      iter = blockBreaks.find(block->name);
+      if (iter == blockBreaks.end()) {
+        breaks = std::move(iter->second);
+        blockBreaks.erase(block->name);
+      }
+    }
+    if (breaks.empty()) {
+      // No breaks with values to here. If there is something sinkable, and there are no
+      // breaks, then so this is simple to handle: sink one of them.
+      if (!sinkables.empty() && !BranchUtils::BranchSeeker::hasNamed(block, block->name)) {
+        auto& info = sinkables.begin()->second;
+        // Reuse the set.
+        auto* set = (*info.item)->template cast<SetLocal>();
+        auto* value = set->value;
+        set->value = block;
+        *info.item = value;
+        block->type = value->type;
+        this->replaceCurrent(set);
+        sinkables.clear();
+        anotherCycle = true;
+      }
+      return;
+    }
+    assert(breaks.size() > 0);
     assert(!(*breaks[0].brp)->template cast<Break>()->value); // block does not already have a return value (if one break has one, they all do)
     // look for a set_local that is present in them all
     bool found = false;
