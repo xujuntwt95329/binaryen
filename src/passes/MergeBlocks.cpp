@@ -236,7 +236,7 @@ static void optimizeBlock(Block* curr, Module* module, PassOptions& passOptions)
             childBlock = loop->body->dynCast<Block>();
             if (childBlock) {
               auto* last = childBlock->list.back();
-              assert(isConcreteType(last->type));
+              assert(isConcreteType(last->type) || last->type == unreachable);
               // Reuse the drop, moving the loop up.
               drop->value = last;
               drop->finalize();

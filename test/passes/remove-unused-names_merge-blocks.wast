@@ -1321,7 +1321,7 @@
    )
   )
  )
- (func $dropped-loop (result i32)
+ (func $dropped-loop
   (drop
    (loop $l1 (result i32)
     (drop (i32.const -1))
@@ -1332,7 +1332,18 @@
   )
   (nop)
  )
- (func $dropped-loop-noblock (result i32)
+ (func $dropped-loop-unreachable
+  (drop
+   (loop $l1 (result i32)
+    (drop (i32.const -1))
+    (br_if $l1 (i32.const 1))
+    (drop (i32.const 1))
+    (unreachable)
+   )
+  )
+  (nop)
+ )
+ (func $dropped-loop-noblock
   (drop
    (loop $l1 (result i32)
     (i32.const 3)
