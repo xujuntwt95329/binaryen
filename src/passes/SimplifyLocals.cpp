@@ -330,6 +330,9 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
   std::vector<Expression**> loops;
 
   void optimizeBlockReturn(Block* block) {
+    // If this block already has a result, or is unreachable code, we have
+    // nothing to do.
+    if (block->type != none) return;
     if (block->name.is() && unoptimizableBlocks.count(block->name) > 0) {
       return;
     }
