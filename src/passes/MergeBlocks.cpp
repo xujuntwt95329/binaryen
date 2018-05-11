@@ -231,8 +231,23 @@ static void optimizeBlock(Block* curr, Module* module, PassOptions& passOptions)
               more = true;
               changed = true;
             }
+          } else if ((loop = drop->value->dynCast<Loop>())) {
+            // We may be able to operate on this dropped loop.
+            childBlock = loop->body->dynCast<Block>();
+            if (childBlock) {
+              auto* last = childBlock->list.back();
+              assert(isConcreteType(last->type));
+              // Reuse the drop, moving the loop up.
+              drop->value = last;
+              drop->finalize();
+              childBlock->list.back() = drop;
+              childBlock->finalize();
+              child = list[i] = loop;
+              more = true;
+              changed = true;
+            }
           }
-        } else if ((loop = list[i]->dynCast<Loop>())) {
+        } else if ((loop = child->dynCast<Loop>())) {
           // We can merge a loop's "tail" - if the body is a block and has
           // instructions at the end that do not branch back.
           childBlock = loop->body->dynCast<Block>();
@@ -259,11 +274,6 @@ static void optimizeBlock(Block* curr, Module* module, PassOptions& passOptions)
         }
         // Maybe there's nothing to do.
         if (start == end) continue;
-        // If we can only do part of the block, and if the block has a flowing value, we
-        // would need special handling for that - not worth it, probably TODO
-        if (start > 0 && isConcreteType(childList.back()->type)) {
-          continue;
-        }
       }
       ExpressionList merged(module->allocator);
       for (size_t j = 0; j < i; j++) {
@@ -279,7 +289,7 @@ static void optimizeBlock(Block* curr, Module* module, PassOptions& passOptions)
       // If we didn't merge it all, update the child.
       if (start > 0) {
         childList.resize(start);
-        // We may have removed unreachable items.
+        // We may have changed the type.
         childBlock->finalize();
         if (auto* loop = child->dynCast<Loop>()) {
           loop->finalize();
