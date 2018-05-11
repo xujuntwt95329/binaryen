@@ -369,8 +369,9 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
           auto* set = (*info.item)->template cast<SetLocal>();
           auto* value = set->value;
           set->value = block;
-          *info.item = value;
-          block->type = value->type;
+          *info.item = Builder(*this->getModule()).makeNop();
+          block->list.push_back(value);
+          block->finalize(value->type);
           this->replaceCurrent(set);
           sinkables.clear();
         }
