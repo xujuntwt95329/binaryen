@@ -109,6 +109,15 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
   // whether this is the first cycle, in which we always disallow teeing
   bool firstCycle;
 
+  // To optimize block and if return values, we might add helper blocks (to
+  // make room for a return value). Doing so can only be done in between
+  // main passes as the main pass tracks set_local locations, and adding
+  // a block might move such a location. We also need to track whether we just
+  // added such blocks, as if so, when optimizing blocks we need to not
+  // try to trivially optimize them - we need to leave them alone for the
+  // outside if or block to use them.
+  bool addedHelperBlocks = false;
+
   // local => # of get_locals for it
   GetLocalCounter getCounter;
 
@@ -348,16 +357,23 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     if (breaks.empty()) {
       // No breaks with values to here. If there is something sinkable, and there are no
       // breaks, then so this is simple to handle: sink one of them.
-      if (!sinkables.empty() && !BranchUtils::BranchSeeker::hasNamed(block, block->name)) {
-        auto& info = sinkables.begin()->second;
-        // Reuse the set.
-        auto* set = (*info.item)->template cast<SetLocal>();
-        auto* value = set->value;
-        set->value = block;
-        *info.item = value;
-        block->type = value->type;
-        this->replaceCurrent(set);
-        sinkables.clear();
+      if (!sinkables.empty() &&
+          !BranchUtils::BranchSeeker::hasNamed(block, block->name)) {
+        // If we added helper blocks, then this might be one of them, but if we
+        // optimize it that would be premature: the better result is to optimize
+        // the outer if or block, so do nothing here, but request another cycle
+        // so we can possibly do it later.
+        if (!addedHelperBlocks) {
+          auto& info = sinkables.begin()->second;
+          // Reuse the set.
+          auto* set = (*info.item)->template cast<SetLocal>();
+          auto* value = set->value;
+          set->value = block;
+          *info.item = value;
+          block->type = value->type;
+          this->replaceCurrent(set);
+          sinkables.clear();
+        }
         anotherCycle = true;
       }
       return;
@@ -620,12 +636,14 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     anotherCycle = false;
     WalkerPass<LinearExecutionWalker<SimplifyLocals<allowTee, allowStructure, allowNesting>>>::doWalkFunction(func);
     // enlarge blocks that were marked, for the next round
+    addedHelperBlocks = false;
     if (blocksToEnlarge.size() > 0) {
       for (auto* block : blocksToEnlarge) {
         block->list.push_back(this->getModule()->allocator.template alloc<Nop>());
       }
       blocksToEnlarge.clear();
       anotherCycle = true;
+      addedHelperBlocks = true;
     }
     // enlarge ifs that were marked, for the next round
     if (ifsToEnlarge.size() > 0) {
@@ -643,6 +661,7 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
       }
       ifsToEnlarge.clear();
       anotherCycle = true;
+      addedHelperBlocks = true;
     }
     // handle loops. note that a lot happens in this pass, and we can't just modify
     // set_locals when we see a loop - it might be tracked - and we can't also just
