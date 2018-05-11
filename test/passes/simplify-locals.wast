@@ -1255,12 +1255,33 @@
    )
   )
   (func $one-sinkable-has-value (param $var$0 i32) (result i32)
-   (block $label$1 (result i32)
+   (block $label$1
     (nop)
     (set_local $var$0
      (i32.const 1)
     )
    )
    (get_local $var$0)
+  )
+  (func $simple-block-sink
+   (local $var$1 i32)
+   (set_local $var$1
+    (i32.const 14)
+   )
+   (nop)
+  )
+  (func $almost-simple-block-sink (param $a i32)
+   (local $b i32)
+   (set_local $b
+    (i32.const 14)
+   )
+   (call $almost-simple-block-sink (get_local $b))
+  )
+  (func $yes-simple-block-sink (param $a i32)
+   (local $b i32)
+   (set_local $b
+    (i32.const 14)
+   )
+   (call $almost-simple-block-sink (get_local $a))
   )
 )
