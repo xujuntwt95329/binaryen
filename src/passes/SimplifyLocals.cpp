@@ -349,7 +349,7 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     std::vector<BlockBreak> breaks;
     if (block->name.is()) {
       iter = blockBreaks.find(block->name);
-      if (iter == blockBreaks.end()) {
+      if (iter != blockBreaks.end()) {
         breaks = std::move(iter->second);
         blockBreaks.erase(block->name);
       }
