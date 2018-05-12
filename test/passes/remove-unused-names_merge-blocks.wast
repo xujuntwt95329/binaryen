@@ -1351,5 +1351,24 @@
   )
   (nop)
  )
+ (func $drop-loop-complex (param $0 i64) (param $1 i64) (param $2 i32) (result f64)
+  (drop
+   (loop $label$1 (result i64)
+    (block $label$2 (result i64)
+     (drop
+      (br_if $label$2
+       (i64.load offset=22
+        (i32.const 0)
+        (i64.const -35)
+       )
+       (i32.const 0)
+      )
+     )
+     (br $label$1)
+    )
+   )
+  )
+  (f64.const -10979)
+ )
 )
 

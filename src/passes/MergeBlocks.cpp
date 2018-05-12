@@ -236,15 +236,20 @@ static void optimizeBlock(Block* curr, Module* module, PassOptions& passOptions)
             childBlock = loop->body->dynCast<Block>();
             if (childBlock) {
               auto* last = childBlock->list.back();
-              assert(isConcreteType(last->type) || last->type == unreachable);
-              // Reuse the drop, moving the loop up.
-              drop->value = last;
-              drop->finalize();
-              childBlock->list.back() = drop;
-              childBlock->finalize();
-              child = list[i] = loop;
-              more = true;
-              changed = true;
+              if (!isConcreteType(last->type)) {
+                // An unreachable - not worth doing anything with.
+                childBlock = nullptr;
+              } else {
+                // Reuse the drop, moving the loop up.
+                drop->value = last;
+                drop->finalize();
+                childBlock->list.back() = drop;
+                childBlock->finalize();
+                loop->finalize();
+                child = list[i] = loop;
+                more = true;
+                changed = true;
+              }
             }
           }
         } else if ((loop = child->dynCast<Loop>())) {

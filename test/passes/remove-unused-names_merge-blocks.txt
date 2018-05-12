@@ -5,6 +5,7 @@
  (type $3 (func))
  (type $4 (func (result i32)))
  (type $5 (func (result f64)))
+ (type $6 (func (param i64 i64 i32) (result f64)))
  (table 1 1 anyfunc)
  (elem (i32.const 0) $call-i)
  (memory $0 (shared 256 256))
@@ -1335,19 +1336,19 @@
   (nop)
  )
  (func $dropped-loop-unreachable (; 42 ;) (type $3)
-  (loop $l1
-   (drop
-    (i32.const -1)
-   )
-   (br_if $l1
-    (i32.const 1)
-   )
-  )
   (drop
-   (i32.const 1)
-  )
-  (drop
-   (unreachable)
+   (loop $l1 (result i32)
+    (drop
+     (i32.const -1)
+    )
+    (br_if $l1
+     (i32.const 1)
+    )
+    (drop
+     (i32.const 1)
+    )
+    (unreachable)
+   )
   )
   (nop)
  )
@@ -1356,5 +1357,23 @@
    (i32.const 3)
   )
   (nop)
+ )
+ (func $drop-loop-complex (; 44 ;) (type $6) (param $0 i64) (param $1 i64) (param $2 i32) (result f64)
+  (drop
+   (loop $label$1 (result i64)
+    (block $label$2 (result i64)
+     (drop
+      (br_if $label$2
+       (i64.load offset=22
+        (i32.const 0)
+       )
+       (i32.const 0)
+      )
+     )
+     (br $label$1)
+    )
+   )
+  )
+  (f64.const -10979)
  )
 )
