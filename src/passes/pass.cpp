@@ -175,6 +175,7 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
     add("coalesce-locals"); // just for localCSE
   }
   if (options.optimizeLevel >= 2 || options.shrinkLevel >= 1) {
+    add("dce");
     add("rse"); // after all coalesce-locals, and before a final vacuum
   }
   add("vacuum"); // just to be safe

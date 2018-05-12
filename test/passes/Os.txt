@@ -1,0 +1,25 @@
+(module
+ (type $0 (func (param f64 f64) (result f64)))
+ (global $global$0 (mut i32) (i32.const 10))
+ (export "func_4" (func $0))
+ (func $0 (; 0 ;) (type $0) (param $0 f64) (param $1 f64) (result f64)
+  (local $2 i32)
+  (if (result f64)
+   (tee_local $2
+    (i32.const -4194304)
+   )
+   (block
+    (set_global $global$0
+     (i32.const -1)
+    )
+    (loop $label$3
+     (set_global $global$0
+      (i32.const 0)
+     )
+     (br $label$3)
+    )
+   )
+   (f64.const 1)
+  )
+ )
+)
