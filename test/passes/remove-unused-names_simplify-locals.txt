@@ -275,7 +275,28 @@
    (i32.const 1)
   )
  )
- (func $unblock-2 (; 16 ;) (type $0)
+ (func $unblock-nested (; 16 ;) (type $0)
+  (local $x i32)
+  (nop)
+  (drop
+   (i32.add
+    (tee_local $x
+     (i32.const 0)
+    )
+    (get_local $x)
+   )
+  )
+  (block
+   (block
+    (nop)
+    (nop)
+    (set_local $x
+     (i32.const 1)
+    )
+   )
+  )
+ )
+ (func $unblock-2 (; 17 ;) (type $0)
   (local $x i32)
   (loop $l
    (nop)
@@ -295,7 +316,7 @@
    )
   )
  )
- (func $unblock-3 (; 17 ;) (type $0)
+ (func $unblock-3 (; 18 ;) (type $0)
   (local $x i32)
   (if
    (i32.const 1)
@@ -334,7 +355,7 @@
    )
   )
  )
- (func $unblock-4 (; 18 ;) (type $0)
+ (func $unblock-4 (; 19 ;) (type $0)
   (local $x i32)
   (drop
    (get_local $x)
@@ -346,10 +367,10 @@
     (i32.const 3)
    )
   )
-  (set_local $x
-   (if (result i32)
-    (i32.const 1)
-    (unreachable)
+  (if
+   (i32.const 1)
+   (unreachable)
+   (set_local $x
     (i32.const 3)
    )
   )
@@ -360,6 +381,34 @@
     (i32.const 3)
    )
    (unreachable)
+  )
+ )
+ (func $unblock-5 (; 20 ;) (type $0)
+  (local $x i32)
+  (drop
+   (get_local $x)
+  )
+  (if
+   (i32.const 1)
+   (set_local $x
+    (i32.const 3)
+   )
+   (unreachable)
+  )
+  (if
+   (i32.const 1)
+   (unreachable)
+   (set_local $x
+    (i32.const 3)
+   )
+  )
+  (nop)
+  (set_local $x
+   (if (result i32)
+    (i32.const 1)
+    (i32.const 2)
+    (i32.const 3)
+   )
   )
  )
 )

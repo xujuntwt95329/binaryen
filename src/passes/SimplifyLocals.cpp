@@ -828,33 +828,31 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
   void runFinalOptimizations(Function* func) {
     // We aggressively move set_locals up and out, creating block, if and loop values,
     // which is generally beneficial as it can lead to further simplifications.
-    // *However*, an exception is when we replace
+    // *However*, after we have done all the work to try to benefit from those
+    // values (by optimizing the sets that they feed into), if we are left with
+    // set_locals of values that we could not optimize, it's best to undo them.
+    // One reason is this:
+    //  (set_local (block (result ..) .. ..))
+    // vs.
     //  (block .. (set_local $x ..))
-    // with
-    //  (set_local (block .. ..))
-    // *if* we are in a "block context" - a place where the binary format gets a
-    // block for free, like a loop body, if arm, or function body. In such cases,
-    // leaving the block on the outside is better as it vanishes.
-    //
-    // Also, after we did our best to use block/if/loop values, at this point
-    // if we see a useless one, we can return the set of the block/if/loop to
-    // the inner position, which is equivalent and often nicer for other opts.
+    // The latter is actually better as we may be in a "block context" - a place
+    // where the binary format gets a block for free, like a loop body, if arm,
+    // or function body. In such cases,/ leaving the block on the outside is
+    // better as it vanishes. Furthermore, the latter may be better anyhow for
+    // compression as it replaces the block value with a "none" which is smaller
+    // and perhaps more compressible. Finally, other optimizations may be more
+    // effective if they see the set directly on the value being set.
     struct BlockContextOptimizer : public PostWalker<BlockContextOptimizer> {
-      void visitLoop(Loop* curr) {
-        optimize(curr->body);
-      }
-      void visitIf(If* curr) {
-        optimize(curr->ifTrue);
-        if (curr->ifFalse) optimize(curr->ifFalse);
-      }
-      void visitFunction(Function* curr) {
-        optimize(curr->body);
+      void visitSetLocal(SetLocal* curr) {
+        Expression* changed = curr;
+        optimize(changed);
+        if (changed != curr) this->replaceCurrent(changed);
       }
 
       // Perform the optimization, on a child node of something we are traversing.
       void optimize(Expression*& child) {
-        if (auto* set = child->dynCast<SetLocal>()) {
-          if (auto* block = set->value->dynCast<Block>()) {
+        if (auto* set = child->template dynCast<SetLocal>()) {
+          if (auto* block = set->value->template dynCast<Block>()) {
             if (!block->name.is() && isConcreteType(block->type)) {
               auto* last = block->list.back();
               set->value = last;
@@ -864,14 +862,14 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
               child = block;
               optimize(block->list.back());
             }
-          } else if (auto* loop = set->value->dynCast<Loop>()) {
+          } else if (auto* loop = set->value->template dynCast<Loop>()) {
             set->value = loop->body;
             set->finalize();
             loop->body = set;
             loop->finalize();
             child = loop;
             optimize(loop->body);
-          } else if (auto* iff = set->value->dynCast<If>()) {
+          } else if (auto* iff = set->value->template dynCast<If>()) {
             if (iff->ifFalse) {
               if (isConcreteType(iff->ifTrue->type) && iff->ifFalse->type == unreachable) {
                 set->value = iff->ifTrue;

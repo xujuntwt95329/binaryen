@@ -757,8 +757,8 @@
  )
  (func $no-out-of-label (; 13 ;) (type $8) (param $x i32) (param $y i32)
   (nop)
-  (set_local $x
-   (loop $moar (result i32)
+  (loop $moar
+   (set_local $x
     (block $block (result i32)
      (br_if $moar
       (get_local $x)
@@ -784,8 +784,8 @@
  (func $freetype-cd (; 14 ;) (type $5) (param $a i32) (result i32)
   (local $e i32)
   (nop)
-  (tee_local $a
-   (loop $while-in$1 (result i32)
+  (loop $while-in$1 (result i32)
+   (tee_local $a
     (block $while-out$0 (result i32)
      (set_local $e
       (get_local $a)

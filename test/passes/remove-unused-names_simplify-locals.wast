@@ -184,6 +184,22 @@
       )
     )
   )
+  (func $unblock-nested
+    (local $x i32)
+    (set_local $x
+      (block (result i32)
+        (set_local $x (i32.const 0))
+        (drop (i32.add (get_local $x) (get_local $x)))
+        (block (result i32)
+          (block (result i32)
+            (nop)
+            (nop)
+            (i32.const 1)
+          )
+        )
+      )
+    )
+  )
   (func $unblock-2
     (local $x i32)
     (loop $l
@@ -232,13 +248,35 @@
     (set_local $x
       (if (result i32) (i32.const 1)
         (unreachable)
-        (i32.const 3) ## this one fails!
+        (i32.const 3)
       )
     )
     (set_local $x
       (if (result i32) (i32.const 1)
         (i32.const 3)
         (unreachable)
+      )
+    )
+  )
+  (func $unblock-5
+    (local $x i32)
+    (drop (get_local $x))
+    (set_local $x
+      (if (result i32) (i32.const 1)
+        (i32.const 3)
+        (unreachable)
+      )
+    )
+    (set_local $x
+      (if (result i32) (i32.const 1)
+        (unreachable)
+        (i32.const 3)
+      )
+    )
+    (set_local $x
+      (if (result i32) (i32.const 1)
+        (i32.const 2)
+        (i32.const 3)
       )
     )
   )
