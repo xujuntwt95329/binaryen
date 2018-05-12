@@ -1,4 +1,3 @@
-#include <wasm-printing.h>
 /*
  * Copyright 2015 WebAssembly Community Group participants
  *
@@ -51,7 +50,6 @@
 #include <wasm-builder.h>
 #include <wasm-traversal.h>
 #include <pass.h>
-#include <ir/branch-utils.h>
 #include <ir/count.h>
 #include <ir/effects.h>
 #include "ir/equivalent_sets.h"
@@ -359,8 +357,7 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     if (breaks.empty()) {
       // No breaks with values to here. If there is something sinkable, and there are no
       // breaks, then so this is simple to handle: sink one of them.
-      if (!sinkables.empty() && !getenv("NONO") &&
-          !BranchUtils::BranchSeeker::hasNamed(block, block->name)) {
+      if (!sinkables.empty() && !block->name.is()) {
         // If we added helper blocks, then this might be one of them, but if we
         // optimize it that would be premature: the better result is to optimize
         // the outer if or block, so do nothing here, but request another cycle
@@ -838,25 +835,20 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     // *if* we are in a "block context" - a place where the binary format gets a
     // block for free, like a loop body, if arm, or function body. In such cases,
     // leaving the block on the outside is better as it vanishes.
-    struct BlockContextOptimizer : public LinearExecutionWalker<BlockContextOptimizer> {
+    struct BlockContextOptimizer : public PostWalker<BlockContextOptimizer> {
       void visitLoop(Loop* curr) {
-std::cout << "A1 " << curr << '\n';
         optimize(curr->body);
       }
       void visitIf(If* curr) {
-std::cout << "A2 " << curr << '\n';
         optimize(curr->ifTrue);
         if (curr->ifFalse) optimize(curr->ifFalse);
       }
       void visitFunction(Function* curr) {
-std::cout << "A " << curr->body << '\n';
         optimize(curr->body);
-std::cout << "B " << curr->body << '\n';
       }
 
       // Perform the optimization, on a child node of something we are traversing.
       void optimize(Expression*& child) {
-std::cout << "A3\n";
         if (auto* set = child->dynCast<SetLocal>()) {
           if (auto* block = set->value->dynCast<Block>()) {
             if (!block->name.is() && isConcreteType(block->type)) {
@@ -866,17 +858,22 @@ std::cout << "A3\n";
               block->list.back() = set;
               block->finalize();
               child = block;
+              optimize(block->list.back());
             }
+          } else if (auto* loop = set->value->dynCast<Loop>()) {
+            set->value = loop->body;
+            set->finalize();
+            loop->body = set;
+            loop->finalize();
+            child = loop;
+            optimize(loop->body);
           }
         }
       }
     };
 
-std::cout << "z1\n";
     BlockContextOptimizer opter;
-std::cout << "z2\n";
     opter.walkFunction(func);
-std::cout << "z3\n";
   }
 
   bool canUseLoopReturnValue(Loop* curr) {
