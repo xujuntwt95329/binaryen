@@ -220,5 +220,27 @@
       )
     )
   )
+  (func $unblock-4
+    (local $x i32)
+    (drop (get_local $x))
+    (set_local $x
+      (if (result i32) (i32.const 1)
+        (i32.const 2)
+        (i32.const 3)
+      )
+    )
+    (set_local $x
+      (if (result i32) (i32.const 1)
+        (unreachable)
+        (i32.const 3) ## this one fails!
+      )
+    )
+    (set_local $x
+      (if (result i32) (i32.const 1)
+        (i32.const 3)
+        (unreachable)
+      )
+    )
+  )
 )
 

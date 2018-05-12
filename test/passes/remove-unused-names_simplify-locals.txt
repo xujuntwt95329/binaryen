@@ -334,4 +334,32 @@
    )
   )
  )
+ (func $unblock-4 (; 18 ;) (type $0)
+  (local $x i32)
+  (drop
+   (get_local $x)
+  )
+  (set_local $x
+   (if (result i32)
+    (i32.const 1)
+    (i32.const 2)
+    (i32.const 3)
+   )
+  )
+  (set_local $x
+   (if (result i32)
+    (i32.const 1)
+    (unreachable)
+    (i32.const 3)
+   )
+  )
+  (nop)
+  (if
+   (i32.const 1)
+   (set_local $x
+    (i32.const 3)
+   )
+   (unreachable)
+  )
+ )
 )

@@ -835,6 +835,10 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     // *if* we are in a "block context" - a place where the binary format gets a
     // block for free, like a loop body, if arm, or function body. In such cases,
     // leaving the block on the outside is better as it vanishes.
+    //
+    // Also, after we did our best to use block/if/loop values, at this point
+    // if we see a useless one, we can return the set of the block/if/loop to
+    // the inner position, which is equivalent and often nicer for other opts.
     struct BlockContextOptimizer : public PostWalker<BlockContextOptimizer> {
       void visitLoop(Loop* curr) {
         optimize(curr->body);
@@ -867,6 +871,24 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
             loop->finalize();
             child = loop;
             optimize(loop->body);
+          } else if (auto* iff = set->value->dynCast<If>()) {
+            if (iff->ifFalse) {
+              if (isConcreteType(iff->ifTrue->type) && iff->ifFalse->type == unreachable) {
+                set->value = iff->ifTrue;
+                set->finalize();
+                iff->ifTrue = set;
+                iff->finalize();
+                child = iff;
+                optimize(iff->ifTrue);
+              } else if (isConcreteType(iff->ifFalse->type) && iff->ifTrue->type == unreachable) {
+                set->value = iff->ifFalse;
+                set->finalize();
+                iff->ifFalse = set;
+                iff->finalize();
+                child = iff;
+                optimize(iff->ifFalse);
+              }
+            }
           }
         }
       }
