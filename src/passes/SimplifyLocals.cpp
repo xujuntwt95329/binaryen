@@ -1,3 +1,4 @@
+#include <wasm-printing.h>
 /*
  * Copyright 2015 WebAssembly Community Group participants
  *
@@ -627,11 +628,13 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
         // opts; continue only if they do. In other words, do not end up
         // doing final opts again and again when no main opts are being
         // enabled.
-        if (runFinalOptimizations(func) && runMainOptimizations(func)) {
+        if (runSecondaryOptimizations(func) && runMainOptimizations(func)) {
           anotherCycle = true;
         }
       }
     } while (anotherCycle);
+    // Finally, do some finishing touches.
+    runFinalOptimizations(func);
   }
 
   bool runMainOptimizations(Function* func) {
@@ -689,7 +692,7 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     return anotherCycle;
   }
 
-  bool runFinalOptimizations(Function* func) {
+  bool runSecondaryOptimizations(Function* func) {
     // Finally, after optimizing a function we can do some additional
     // optimization.
     getCounter.analyze(func);
@@ -823,6 +826,57 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     setRemover.walkFunction(func);
 
     return eqOpter.anotherCycle || setRemover.anotherCycle;
+  }
+
+  void runFinalOptimizations(Function* func) {
+    // We aggressively move set_locals up and out, creating block, if and loop values,
+    // which is generally beneficial as it can lead to further simplifications.
+    // *However*, an exception is when we replace
+    //  (block .. (set_local $x ..))
+    // with
+    //  (set_local (block .. ..))
+    // *if* we are in a "block context" - a place where the binary format gets a
+    // block for free, like a loop body, if arm, or function body. In such cases,
+    // leaving the block on the outside is better as it vanishes.
+    struct BlockContextOptimizer : public LinearExecutionWalker<BlockContextOptimizer> {
+      void visitLoop(Loop* curr) {
+std::cout << "A1 " << curr << '\n';
+        optimize(curr->body);
+      }
+      void visitIf(If* curr) {
+std::cout << "A2 " << curr << '\n';
+        optimize(curr->ifTrue);
+        if (curr->ifFalse) optimize(curr->ifFalse);
+      }
+      void visitFunction(Function* curr) {
+std::cout << "A " << curr->body << '\n';
+        optimize(curr->body);
+std::cout << "B " << curr->body << '\n';
+      }
+
+      // Perform the optimization, on a child node of something we are traversing.
+      void optimize(Expression*& child) {
+std::cout << "A3\n";
+        if (auto* set = child->dynCast<SetLocal>()) {
+          if (auto* block = set->value->dynCast<Block>()) {
+            if (!block->name.is() && isConcreteType(block->type)) {
+              auto* last = block->list.back();
+              set->value = last;
+              set->finalize();
+              block->list.back() = set;
+              block->finalize();
+              child = block;
+            }
+          }
+        }
+      }
+    };
+
+std::cout << "z1\n";
+    BlockContextOptimizer opter;
+std::cout << "z2\n";
+    opter.walkFunction(func);
+std::cout << "z3\n";
   }
 
   bool canUseLoopReturnValue(Loop* curr) {
