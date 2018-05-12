@@ -6,6 +6,7 @@
  (type $4 (func (param i32) (result i32)))
  (type $5 (func (param i32)))
  (type $6 (func (param i32) (result f32)))
+ (type $7 (func (param i32 i64 i32)))
  (func $pick (; 0 ;) (type $0)
   (local $x i32)
   (local $y i32)
@@ -409,6 +410,21 @@
     (i32.const 2)
     (i32.const 3)
    )
+  )
+ )
+ (func $unblock-unreachable (; 21 ;) (type $7) (param $var$0 i32) (param $var$1 i64) (param $var$2 i32)
+  (local $var$3 f32)
+  (if
+   (i32.const 1)
+   (block
+    (loop $label$2
+     (br $label$2)
+    )
+    (set_local $var$3
+     (get_local $var$3)
+    )
+   )
+   (unreachable)
   )
  )
 )

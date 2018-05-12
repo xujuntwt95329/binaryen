@@ -858,33 +858,33 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
               set->value = last;
               set->finalize();
               block->list.back() = set;
-              block->finalize();
               child = block;
               optimize(block->list.back());
+              block->finalize();
             }
           } else if (auto* loop = set->value->template dynCast<Loop>()) {
             set->value = loop->body;
             set->finalize();
             loop->body = set;
-            loop->finalize();
             child = loop;
             optimize(loop->body);
+            loop->finalize();
           } else if (auto* iff = set->value->template dynCast<If>()) {
             if (iff->ifFalse) {
               if (isConcreteType(iff->ifTrue->type) && iff->ifFalse->type == unreachable) {
                 set->value = iff->ifTrue;
                 set->finalize();
                 iff->ifTrue = set;
-                iff->finalize();
                 child = iff;
                 optimize(iff->ifTrue);
+                iff->finalize();
               } else if (isConcreteType(iff->ifFalse->type) && iff->ifTrue->type == unreachable) {
                 set->value = iff->ifFalse;
                 set->finalize();
                 iff->ifFalse = set;
-                iff->finalize();
                 child = iff;
                 optimize(iff->ifFalse);
+                iff->finalize();
               }
             }
           }

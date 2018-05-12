@@ -280,5 +280,20 @@
       )
     )
   )
+  (func $unblock-unreachable (param $var$0 i32) (param $var$1 i64) (param $var$2 i32)
+   (local $var$3 f32)
+   (set_local $var$3
+    (if (result f32)
+     (i32.const 1)
+     (block (result f32)
+      (loop $label$2
+       (br $label$2)
+      )
+      (get_local $var$3)
+     )
+     (unreachable)
+    )
+   )
+  )
 )
 
