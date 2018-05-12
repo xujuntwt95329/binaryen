@@ -2617,7 +2617,7 @@
           (set_local $11
            (i32.const 0)
           )
-          (loop $while-in4 (result i32)
+          (loop $while-in4
            (if
             (i32.eqz
              (i32.and
@@ -2658,7 +2658,7 @@
              (get_local $11)
             )
            )
-           (if (result i32)
+           (br_if $while-in4
             (i32.eq
              (i32.and
               (tee_local $6
@@ -2677,15 +2677,12 @@
              )
              (i32.const 32)
             )
-            (br $while-in4)
-            (block (result i32)
-             (set_local $6
-              (get_local $1)
-             )
-             (get_local $11)
-            )
            )
           )
+          (set_local $6
+           (get_local $1)
+          )
+          (get_local $11)
          )
          (i32.const 0)
         )
@@ -6614,7 +6611,7 @@
                (get_local $14)
               )
              )
-             (loop $while-in127 (result i32)
+             (loop $while-in127
               (drop
                (br_if $__rjti$7
                 (get_local $5)
@@ -6669,15 +6666,14 @@
                 (i32.const 4)
                )
               )
-              (if (result i32)
+              (br_if $while-in127
                (i32.lt_u
                 (get_local $6)
                 (get_local $5)
                )
-               (br $while-in127)
-               (get_local $5)
               )
              )
+             (get_local $5)
             )
             (i32.const 0)
            )
@@ -6965,7 +6961,7 @@
            (br $label$break$L343)
           )
          )
-         (if (result i32)
+         (br_if $while-in132
           (i32.lt_s
            (tee_local $0
             (i32.add
@@ -6975,9 +6971,8 @@
            )
            (i32.const 10)
           )
-          (br $while-in132)
-          (i32.const 1)
          )
+         (i32.const 1)
         )
         (i32.const 1)
        )
@@ -11086,15 +11081,14 @@
               (br $__rjti$11)
              )
             )
-            (if (result i32)
+            (br_if $while-in47
              (tee_local $2
               (i32.load offset=8
                (get_local $2)
               )
              )
-             (br $while-in47)
-             (i32.const 624)
             )
+            (i32.const 624)
            )
           )
          )

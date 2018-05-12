@@ -739,13 +739,13 @@
      (i32.const 6)
     )
    )
-   (if (result i32)
-    (i32.const 6)
-    (br $outval
+   (drop
+    (br_if $outval
      (i32.const 7)
+     (i32.const 6)
     )
-    (i32.const 8)
    )
+   (i32.const 8)
   )
  )
  (func $threading (; 27 ;) (type $1)
@@ -952,15 +952,16 @@
  (func $loop-if (; 33 ;) (type $2) (result i32)
   (block $outer (result i32)
    (loop $typed (result i32)
-    (if (result i32)
-     (i32.const 2)
-     (block $block (result i32)
-      (drop
-       (call $loop-if)
-      )
-      (i32.const 0)
+    (br_if $typed
+     (i32.eqz
+      (i32.const 2)
      )
-     (br $typed)
+    )
+    (block $block (result i32)
+     (drop
+      (call $loop-if)
+     )
+     (i32.const 0)
     )
    )
   )

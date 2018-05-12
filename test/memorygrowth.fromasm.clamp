@@ -8303,7 +8303,7 @@
       (set_local $4
        (get_local $3)
       )
-      (loop $while-in (result i32)
+      (loop $while-in
        (if
         (i32.eqz
          (i32.load8_s
@@ -8317,7 +8317,7 @@
          (br $label$break$a)
         )
        )
-       (if (result i32)
+       (br_if $while-in
         (i32.and
          (tee_local $4
           (tee_local $0
@@ -8329,15 +8329,12 @@
          )
          (i32.const 3)
         )
-        (br $while-in)
-        (block (result i32)
-         (set_local $1
-          (i32.const 4)
-         )
-         (get_local $0)
-        )
        )
       )
+      (set_local $1
+       (i32.const 4)
+      )
+      (get_local $0)
      )
      (block (result i32)
       (set_local $1
