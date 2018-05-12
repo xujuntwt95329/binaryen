@@ -160,7 +160,9 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
     add("code-folding");
   }
-  add("merge-blocks"); // makes remove-unused-brs more effective
+  if (options.optimizeLevel >= 2 || options.shrinkLevel >= 1) {
+    add("merge-blocks"); // makes remove-unused-brs more effective
+  }
   add("remove-unused-brs"); // coalesce-locals opens opportunities for optimizations
   add("merge-blocks"); // clean up remove-unused-brs new blocks
   add("optimize-instructions");
