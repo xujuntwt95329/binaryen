@@ -295,5 +295,39 @@
     )
    )
   )
+  (func $sink-drop
+   (local $0 i64)
+   (local $1 i32)
+   (loop $label$1
+    (loop $label$2
+     (if
+      (i32.const 1)
+      (unreachable)
+     )
+     (if
+      (block (result i32)
+       (if
+        (tee_local $1
+         (i32.const -79)
+        )
+        (br_if $label$2
+         (get_local $1)
+        )
+        (block
+         (nop)
+         (unreachable)
+        )
+       )
+       (i32.const 0)
+      )
+      (set_local $0
+       (i64.const 1)
+      )
+      (unreachable)
+     )
+    )
+    (br $label$1)
+   )
+  )
 )
 

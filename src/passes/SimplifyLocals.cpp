@@ -60,6 +60,92 @@
 
 namespace wasm {
 
+// Helpers
+
+// We aggressively move set_locals up and out, creating block, if and loop values,
+// which is generally beneficial as it can lead to further simplifications.
+// *However*, after we have done all the work to try to benefit from those
+// values (by optimizing the sets that they feed into), if we are left with
+// set_locals of values that we could not optimize, it's best to undo them.
+// One reason is this:
+//  (set_local (block (result ..) .. ..))
+// vs.
+//  (block .. (set_local $x ..))
+// The latter is actually better as we may be in a "block context" - a place
+// where the binary format gets a block for free, like a loop body, if arm,
+// or function body. In such cases,/ leaving the block on the outside is
+// better as it vanishes. Furthermore, the latter may be better anyhow for
+// compression as it replaces the block value with a "none" which is smaller
+// and perhaps more compressible. Finally, other optimizations may be more
+// effective if they see the set directly on the value being set.
+//
+// A similar optimization may be done on drops, which we can create if
+// we replace a set_local with a drop.
+struct BlockContextOptimizer : public PostWalker<BlockContextOptimizer> {
+  bool needReFinalize = false;
+
+  void visitSetLocal(SetLocal* curr) {
+    Expression* changed = curr;
+    optimize<SetLocal>(changed);
+    if (changed != curr) this->replaceCurrent(changed);
+  }
+
+  void visitDrop(Drop* curr) {
+    Expression* changed = curr;
+    optimize<Drop>(changed);
+    if (changed != curr) this->replaceCurrent(changed);
+  }
+
+  // Perform the optimization, on a child node of something we are traversing.
+  template<typename T>
+  void optimize(Expression*& child) {
+    auto* cast = child->template cast<T>();
+    if (auto* block = cast->value->template dynCast<Block>()) {
+      // If there might be breaks, a single set/drop may not be enough.
+      if (!block->name.is()) {
+        auto* last = block->list.back();
+        cast->value = last;
+        cast->finalize();
+        block->list.back() = cast;
+        child = block;
+        optimize<T>(block->list.back());
+        needReFinalize = true;
+      }
+    } else if (auto* loop = cast->value->template dynCast<Loop>()) {
+      cast->value = loop->body;
+      cast->finalize();
+      loop->body = cast;
+      child = loop;
+      optimize<T>(loop->body);
+      needReFinalize = true;
+    } else if (auto* iff = cast->value->template dynCast<If>()) {
+      if (iff->ifFalse) {
+        if (isConcreteType(iff->ifTrue->type) && iff->ifFalse->type == unreachable) {
+          cast->value = iff->ifTrue;
+          cast->finalize();
+          iff->ifTrue = cast;
+          child = iff;
+          optimize<T>(iff->ifTrue);
+          needReFinalize = true;
+        } else if (isConcreteType(iff->ifFalse->type) && iff->ifTrue->type == unreachable) {
+          cast->value = iff->ifFalse;
+          cast->finalize();
+          iff->ifFalse = cast;
+          child = iff;
+          optimize<T>(iff->ifFalse);
+          needReFinalize = true;
+        }
+      }
+    }
+  }
+
+  void visitFunction(Function* curr) {
+    if (needReFinalize) {
+      ReFinalize().walk(curr->body);
+    }
+  }
+};
+
 // Main class
 
 template<bool allowTee = true, bool allowStructure = true, bool allowNesting = true>
@@ -358,7 +444,7 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     if (breaks.empty()) {
       // No breaks with values to here. If there is something sinkable, and there are no
       // breaks, then so this is simple to handle: sink one of them.
-      if (!sinkables.empty() && !block->name.is()) {
+      if (!sinkables.empty() && !block->name.is() && !getenv("NONO")) {
         // If we added helper blocks, then this might be one of them, but if we
         // optimize it that would be premature: the better result is to optimize
         // the outer if or block, so do nothing here, but request another cycle
@@ -827,81 +913,6 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
   }
 
   void runFinalOptimizations(Function* func) {
-    // We aggressively move set_locals up and out, creating block, if and loop values,
-    // which is generally beneficial as it can lead to further simplifications.
-    // *However*, after we have done all the work to try to benefit from those
-    // values (by optimizing the sets that they feed into), if we are left with
-    // set_locals of values that we could not optimize, it's best to undo them.
-    // One reason is this:
-    //  (set_local (block (result ..) .. ..))
-    // vs.
-    //  (block .. (set_local $x ..))
-    // The latter is actually better as we may be in a "block context" - a place
-    // where the binary format gets a block for free, like a loop body, if arm,
-    // or function body. In such cases,/ leaving the block on the outside is
-    // better as it vanishes. Furthermore, the latter may be better anyhow for
-    // compression as it replaces the block value with a "none" which is smaller
-    // and perhaps more compressible. Finally, other optimizations may be more
-    // effective if they see the set directly on the value being set.
-    struct BlockContextOptimizer : public PostWalker<BlockContextOptimizer> {
-      bool needReFinalize = false;
-
-      void visitSetLocal(SetLocal* curr) {
-        Expression* changed = curr;
-        optimize(changed);
-        if (changed != curr) this->replaceCurrent(changed);
-      }
-
-      // Perform the optimization, on a child node of something we are traversing.
-      void optimize(Expression*& child) {
-        if (auto* set = child->template dynCast<SetLocal>()) {
-          if (auto* block = set->value->template dynCast<Block>()) {
-            // If there might be breaks, a single set may not be enough.
-            if (!block->name.is()) {
-              auto* last = block->list.back();
-              set->value = last;
-              set->finalize();
-              block->list.back() = set;
-              child = block;
-              optimize(block->list.back());
-              needReFinalize = true;
-            }
-          } else if (auto* loop = set->value->template dynCast<Loop>()) {
-            set->value = loop->body;
-            set->finalize();
-            loop->body = set;
-            child = loop;
-            optimize(loop->body);
-            needReFinalize = true;
-          } else if (auto* iff = set->value->template dynCast<If>()) {
-            if (iff->ifFalse) {
-              if (isConcreteType(iff->ifTrue->type) && iff->ifFalse->type == unreachable) {
-                set->value = iff->ifTrue;
-                set->finalize();
-                iff->ifTrue = set;
-                child = iff;
-                optimize(iff->ifTrue);
-                needReFinalize = true;
-              } else if (isConcreteType(iff->ifFalse->type) && iff->ifTrue->type == unreachable) {
-                set->value = iff->ifFalse;
-                set->finalize();
-                iff->ifFalse = set;
-                child = iff;
-                optimize(iff->ifFalse);
-                needReFinalize = true;
-              }
-            }
-          }
-        }
-      }
-
-      void visitFunction(Function* curr) {
-        if (needReFinalize) {
-          ReFinalize().walk(curr->body);
-        }
-      }
-    };
-
     BlockContextOptimizer opter;
     opter.walkFunction(func);
   }

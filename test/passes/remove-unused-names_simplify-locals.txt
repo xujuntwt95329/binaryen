@@ -11,44 +11,40 @@
   (local $x i32)
   (local $y i32)
   (drop
-   (block (result i32)
-    (drop
-     (get_local $y)
-    )
-    (if
-     (i32.const 1)
-     (drop
-      (i32.const 1)
-     )
-    )
-    (drop
-     (get_local $y)
-    )
-    (nop)
-    (get_local $y)
+   (get_local $y)
+  )
+  (if
+   (i32.const 1)
+   (drop
+    (i32.const 1)
    )
+  )
+  (drop
+   (get_local $y)
+  )
+  (nop)
+  (drop
+   (get_local $y)
   )
  )
  (func $pick-2 (; 1 ;) (type $0)
   (local $x i32)
   (local $y i32)
   (drop
-   (block (result i32)
-    (drop
-     (get_local $x)
-    )
-    (if
-     (i32.const 1)
-     (drop
-      (i32.const 1)
-     )
-    )
-    (drop
-     (get_local $x)
-    )
-    (nop)
-    (get_local $x)
+   (get_local $x)
+  )
+  (if
+   (i32.const 1)
+   (drop
+    (i32.const 1)
    )
+  )
+  (drop
+   (get_local $x)
+  )
+  (nop)
+  (drop
+   (get_local $x)
   )
  )
  (func $many (; 2 ;) (type $0)
@@ -56,59 +52,57 @@
   (local $y i32)
   (local $z i32)
   (local $w i32)
+  (nop)
+  (nop)
+  (set_local $z
+   (get_local $x)
+  )
   (drop
-   (block (result i32)
-    (nop)
-    (nop)
-    (set_local $z
-     (get_local $x)
-    )
-    (drop
-     (get_local $x)
-    )
-    (if
-     (i32.const 1)
-     (drop
-      (i32.const 1)
-     )
-    )
-    (set_local $x
-     (get_local $z)
-    )
-    (if
-     (i32.const 1)
-     (drop
-      (i32.const 1)
-     )
-    )
-    (nop)
-    (nop)
-    (drop
-     (get_local $x)
-    )
-    (nop)
-    (set_local $x
-     (tee_local $z
-      (i32.const 2)
-     )
-    )
-    (if
-     (i32.const 1)
-     (drop
-      (i32.const 1)
-     )
-    )
-    (nop)
-    (nop)
-    (drop
-     (get_local $x)
-    )
-    (set_local $z
-     (i32.const 2)
-    )
-    (nop)
-    (get_local $x)
+   (get_local $x)
+  )
+  (if
+   (i32.const 1)
+   (drop
+    (i32.const 1)
    )
+  )
+  (set_local $x
+   (get_local $z)
+  )
+  (if
+   (i32.const 1)
+   (drop
+    (i32.const 1)
+   )
+  )
+  (nop)
+  (nop)
+  (drop
+   (get_local $x)
+  )
+  (nop)
+  (set_local $x
+   (tee_local $z
+    (i32.const 2)
+   )
+  )
+  (if
+   (i32.const 1)
+   (drop
+    (i32.const 1)
+   )
+  )
+  (nop)
+  (nop)
+  (drop
+   (get_local $x)
+  )
+  (set_local $z
+   (i32.const 2)
+  )
+  (nop)
+  (drop
+   (get_local $x)
   )
  )
  (func $loop-copies (; 3 ;) (type $1) (param $x i32) (param $y i32)
@@ -217,12 +211,10 @@
  )
  (func $simple-block-sink (; 11 ;) (type $0)
   (local $var$1 i32)
+  (nop)
+  (nop)
   (drop
-   (block (result i32)
-    (nop)
-    (nop)
-    (i32.const 14)
-   )
+   (i32.const 14)
   )
  )
  (func $almost-simple-block-sink (; 12 ;) (type $5) (param $a i32)
@@ -234,27 +226,25 @@
  )
  (func $yes-simple-block-sink (; 13 ;) (type $5) (param $a i32)
   (local $b i32)
+  (nop)
+  (call $almost-simple-block-sink
+   (get_local $a)
+  )
   (drop
-   (block (result i32)
-    (nop)
-    (call $almost-simple-block-sink
-     (get_local $a)
-    )
-    (i32.const 14)
-   )
+   (i32.const 14)
   )
  )
  (func $flow-throw-many (; 14 ;) (type $6) (param $var$0 i32) (result f32)
   (local $var$1 f32)
   (local $temp f32)
   (loop $label$1
-   (drop
-    (block (result f32)
-     (br_if $label$1
-      (i32.load
-       (i32.const 3)
-      )
+   (block
+    (br_if $label$1
+     (i32.load
+      (i32.const 3)
      )
+    )
+    (drop
      (get_local $var$1)
     )
    )
@@ -425,6 +415,47 @@
     )
    )
    (unreachable)
+  )
+ )
+ (func $sink-drop (; 22 ;) (type $0)
+  (local $0 i64)
+  (local $1 i32)
+  (loop $label$1
+   (loop $label$2
+    (if
+     (i32.const 1)
+     (unreachable)
+    )
+    (nop)
+    (if
+     (block (result i32)
+      (if
+       (tee_local $1
+        (i32.const -79)
+       )
+       (br_if $label$2
+        (get_local $1)
+       )
+       (block
+        (nop)
+        (unreachable)
+       )
+      )
+      (i32.const 0)
+     )
+     (block
+      (nop)
+      (drop
+       (i64.const 1)
+      )
+     )
+     (block
+      (unreachable)
+      (nop)
+     )
+    )
+   )
+   (br $label$1)
   )
  )
 )
