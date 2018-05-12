@@ -258,16 +258,24 @@ struct Vacuum : public WalkerPass<PostWalker<Vacuum>> {
           curr->ifTrue = left;
           curr->ifFalse = right;
           curr->finalize();
-          replaceCurrent(Builder(*getModule()).makeDrop(curr));
+          replaceWithDropOf(curr);
         }
       }
     } else {
       // no else
       if (curr->ifTrue->is<Nop>()) {
         // no nothing
-        replaceCurrent(Builder(*getModule()).makeDrop(curr->condition));
+        replaceWithDropOf(curr->condition);
       }
     }
+  }
+
+  // Replaces the current node with a drop of a particular expression,
+  // and further vacuums inside that drop if possible.
+  void replaceWithDropOf(Expression* curr) {
+    auto* drop = Builder(*getModule()).makeDrop(curr);
+    replaceCurrent(drop);
+    visitDrop(drop);
   }
 
   void visitLoop(Loop* curr) {

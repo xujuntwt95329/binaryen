@@ -304,4 +304,13 @@
   (local $0 i32)
   (nop)
  )
+ (func $if-condition-recurse (; 35 ;) (type $0)
+  (drop
+   (i32.load offset=76
+    (i32.load
+     (i32.const 52)
+    )
+   )
+  )
+ )
 )

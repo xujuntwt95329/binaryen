@@ -659,4 +659,17 @@
     )
    )
   )
+  (func $if-condition-recurse
+   (if
+    (i32.gt_s
+      (i32.load offset=76
+      (i32.load
+       (i32.const 52)
+      )
+     )
+     (i32.const -1)
+    )
+    (nop)
+   )
+  )
 )

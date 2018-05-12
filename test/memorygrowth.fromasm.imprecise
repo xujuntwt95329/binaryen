@@ -8427,7 +8427,7 @@
  (func $_a (; 18 ;) (param $0 i32) (result i32)
   (local $1 i32)
   (local $2 i32)
-  (tee_local $1
+  (tee_local $2
    (block $do-once (result i32)
     (if (result i32)
      (get_local $0)
@@ -8467,57 +8467,54 @@
        (i32.const 1188)
       )
       (if
-       (tee_local $2
+       (tee_local $1
         (i32.load
          (i32.const 1184)
         )
        )
        (block
-        (set_local $1
-         (get_local $2)
-        )
         (set_local $2
+         (get_local $1)
+        )
+        (set_local $1
          (get_local $0)
         )
         (loop $while-in
-         (set_local $0
-          (i32.const 0)
-         )
          (if
           (i32.gt_u
            (i32.load offset=20
-            (get_local $1)
+            (get_local $2)
            )
            (i32.load offset=28
-            (get_local $1)
+            (get_local $2)
            )
           )
-          (set_local $2
+          (set_local $1
            (i32.or
             (call $$a
-             (get_local $1)
+             (get_local $2)
             )
-            (get_local $2)
+            (get_local $1)
            )
           )
          )
          (br_if $while-in
-          (tee_local $1
+          (tee_local $2
            (i32.load offset=56
-            (get_local $1)
+            (get_local $2)
            )
           )
          )
         )
        )
-       (set_local $2
+       (set_local $1
         (get_local $0)
        )
       )
       (call $xa
        (i32.const 1188)
       )
-      (get_local $2)
+      (get_local $1)
      )
     )
    )
@@ -9099,15 +9096,12 @@
   (local $1 i32)
   (local $2 i32)
   (drop
-   (i32.gt_s
-    (i32.load offset=76
-     (tee_local $1
-      (i32.load
-       (i32.const 1024)
-      )
+   (i32.load offset=76
+    (tee_local $1
+     (i32.load
+      (i32.const 1024)
      )
     )
-    (i32.const -1)
    )
   )
   (i32.shr_s
