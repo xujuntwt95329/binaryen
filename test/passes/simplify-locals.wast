@@ -1284,4 +1284,25 @@
    )
    (call $almost-simple-block-sink (get_local $a))
   )
+  (func $flow-throw-many (param $var$0 i32) (result f32)
+   (local $var$1 f32)
+   (local $temp f32)
+   (loop $label$1
+    (set_local $var$1
+     (block $label$2 (result f32)
+      (br_if $label$1
+       (i32.atomic.load16_u
+        (i32.const 3)
+       )
+      )
+      (tee_local $temp
+       (loop (result f32)
+        (get_local $var$1) ;; a trivial copy, given where we set it
+       )
+      )
+     )
+    )
+    (br $label$1)
+   )
+  )
 )

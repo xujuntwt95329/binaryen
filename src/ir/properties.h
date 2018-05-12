@@ -146,6 +146,23 @@ inline Index getZeroExtBits(Expression* curr) {
   return Bits::getMaskedBits(curr->cast<Binary>()->right->cast<Const>()->value.geti32());
 }
 
+// Looks through tees, block and loop final values, etc.
+inline Expression* getFlowingValue(Expression* curr) {
+  while (1) {
+    if (auto* block = curr->dynCast<Block>()) {
+      assert(!block->list.empty());
+      curr = block->list.back();
+    } else if (auto* loop = curr->dynCast<Loop>()) {
+      curr = loop->body;
+    } else if (auto* set = curr->dynCast<SetLocal>()) {
+      assert(set->isTee());
+      curr = set->value;
+    } else {
+      return curr;
+    }
+  }
+}
+
 } // Properties
 
 } // wasm

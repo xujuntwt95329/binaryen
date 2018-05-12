@@ -894,7 +894,9 @@
  (func $if-return-but-unreachable (; 18 ;) (type $10) (param $var$0 i64)
   (if
    (unreachable)
-   (nop)
+   (drop
+    (get_local $var$0)
+   )
    (set_local $var$0
     (i64.const 1)
    )
@@ -912,6 +914,7 @@
  (type $7 (func (param i32 i32)))
  (type $8 (func (result f64)))
  (type $9 (func (param i32 i32) (result f64)))
+ (type $10 (func (param i32) (result f32)))
  (memory $0 (shared 256 256))
  (func $nonatomics (; 0 ;) (type $FUNCSIG$i) (result i32)
   (local $x i32)
@@ -1307,14 +1310,16 @@
   (local $y i32)
   (local $z i32)
   (local $w i32)
-  (set_local $x
+  (drop
    (block (result i32)
     (nop)
     (nop)
     (set_local $z
      (get_local $x)
     )
-    (nop)
+    (drop
+     (get_local $x)
+    )
     (if
      (i32.const 1)
      (drop
@@ -1491,6 +1496,25 @@
     )
     (i32.const 14)
    )
+  )
+ )
+ (func $flow-throw-many (; 30 ;) (type $10) (param $var$0 i32) (result f32)
+  (local $var$1 f32)
+  (local $temp f32)
+  (loop $label$1
+   (drop
+    (block $label$2 (result f32)
+     (br_if $label$1
+      (i32.atomic.load16_u
+       (i32.const 3)
+      )
+     )
+     (loop $loop-in (result f32)
+      (get_local $var$1)
+     )
+    )
+   )
+   (br $label$1)
   )
  )
 )

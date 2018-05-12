@@ -1317,4 +1317,44 @@
   )
   (unreachable)
  )
+ (func $dropped-loop (; 41 ;) (type $3)
+  (loop $l1
+   (drop
+    (i32.const -1)
+   )
+   (br_if $l1
+    (i32.const 1)
+   )
+  )
+  (drop
+   (i32.const 1)
+  )
+  (drop
+   (i32.const 3)
+  )
+  (nop)
+ )
+ (func $dropped-loop-unreachable (; 42 ;) (type $3)
+  (loop $l1
+   (drop
+    (i32.const -1)
+   )
+   (br_if $l1
+    (i32.const 1)
+   )
+  )
+  (drop
+   (i32.const 1)
+  )
+  (drop
+   (unreachable)
+  )
+  (nop)
+ )
+ (func $dropped-loop-noblock (; 43 ;) (type $3)
+  (drop
+   (i32.const 3)
+  )
+  (nop)
+ )
 )

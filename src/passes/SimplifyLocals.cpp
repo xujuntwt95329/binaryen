@@ -56,6 +56,7 @@
 #include "ir/equivalent_sets.h"
 #include <ir/find_all.h>
 #include <ir/manipulation.h>
+#include <ir/properties.h>
 
 namespace wasm {
 
@@ -723,21 +724,16 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
       }
 
       void visitSetLocal(SetLocal *curr) {
-        // Remove trivial copies, even through a tee
-        auto* value = curr->value;
-        while (auto* subSet = value->dynCast<SetLocal>()) {
-          value = subSet->value;
-        }
-        if (auto* get = value->dynCast<GetLocal>()) {
+        // Remove trivial copies, even through a tee etc.
+        auto* flowingValue = Properties::getFlowingValue(curr->value);
+        if (auto* get = flowingValue->dynCast<GetLocal>()) {
           if (equivalences.check(curr->index, get->index)) {
             // This is an unnecessary copy!
             if (removeEquivalentSets) {
               if (curr->isTee()) {
-                this->replaceCurrent(value);
-              } else if (curr->value->is<GetLocal>()) {
-                ExpressionManipulator::nop(curr);
+                this->replaceCurrent(curr->value);
               } else {
-                this->replaceCurrent(Builder(*module).makeDrop(value));
+                this->replaceCurrent(Builder(*module).makeDrop(curr->value));
               }
               anotherCycle = true;
             }
