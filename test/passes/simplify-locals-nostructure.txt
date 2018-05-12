@@ -20,10 +20,12 @@
    (nop)
   )
   (nop)
-  (drop
-   (if (result i32)
-    (i32.const 2)
+  (if
+   (i32.const 2)
+   (drop
     (i32.const 3)
+   )
+   (drop
     (i32.const 4)
    )
   )

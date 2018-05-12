@@ -573,28 +573,24 @@
   )
  )
  (func $conditionalTypeFun (; 34 ;)
-  (drop
-   (if (result i32)
-    (call $return_int)
-    (i32.trunc_s/f64
-     (call $abort
-      (f64.convert_s/i32
-       (i32.const 5)
-      )
+  (if
+   (call $return_int)
+   (drop
+    (call $abort
+     (f64.convert_s/i32
+      (i32.const 5)
      )
     )
-    (i32.const 2)
    )
   )
-  (drop
-   (if (result f64)
-    (call $return_int)
+  (if
+   (call $return_int)
+   (drop
     (call $abort
      (f64.convert_s/i32
       (i32.const 7)
      )
     )
-    (f64.const 4.5)
    )
   )
  )

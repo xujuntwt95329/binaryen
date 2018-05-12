@@ -34,10 +34,12 @@
    (nop)
   )
   (nop)
-  (drop
-   (if (result i32)
-    (i32.const 2)
+  (if
+   (i32.const 2)
+   (drop
     (i32.const 3)
+   )
+   (drop
     (i32.const 4)
    )
   )
@@ -48,15 +50,17 @@
    )
   )
   (nop)
-  (drop
-   (if (result i32)
-    (i32.const 6)
-    (block (result i32)
-     (nop)
+  (if
+   (i32.const 6)
+   (block
+    (nop)
+    (drop
      (i32.const 7)
     )
-    (block (result i32)
-     (nop)
+   )
+   (block
+    (nop)
+    (drop
      (i32.const 8)
     )
    )
@@ -808,9 +812,9 @@
  )
  (func $drop-if-value (; 15 ;) (type $9) (param $x i32) (param $y i32) (param $z i32) (result i32)
   (local $temp i32)
-  (drop
-   (if (result i32)
-    (get_local $x)
+  (if
+   (get_local $x)
+   (drop
     (block $block53 (result i32)
      (nop)
      (set_local $temp
@@ -818,6 +822,8 @@
      )
      (get_local $z)
     )
+   )
+   (drop
     (block $block54 (result i32)
      (nop)
      (set_local $temp

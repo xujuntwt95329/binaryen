@@ -134,6 +134,18 @@ struct BlockContextOptimizer : public PostWalker<BlockContextOptimizer> {
           child = iff;
           optimize<T>(iff->ifFalse);
           needReFinalize = true;
+        } else if (cast->template is<Drop>() && isConcreteType(iff->ifTrue->type) && isConcreteType(iff->ifFalse->type)) {
+          // If both sides of an if are concrete, we need to add a node. Adding
+          // a set_local may increase code size, but adding a drop is guaranteed
+          // to lead to further optimizations down the line.
+          cast->value = iff->ifTrue;
+          cast->finalize();
+          iff->ifTrue = cast;
+          child = iff;
+          optimize<T>(iff->ifTrue);
+          iff->ifFalse = Builder(*this->getModule()).makeDrop(iff->ifFalse);
+          optimize<T>(iff->ifFalse);
+          needReFinalize = true;
         }
       }
     }
@@ -914,6 +926,7 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
 
   void runFinalOptimizations(Function* func) {
     BlockContextOptimizer opter;
+    opter.setModule(this->getModule());
     opter.walkFunction(func);
   }
 

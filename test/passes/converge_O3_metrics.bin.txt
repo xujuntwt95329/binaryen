@@ -1,20 +1,20 @@
 total
- [funcs]        : 9       
+ [funcs]        : 8       
  [memory-data]  : 28      
  [table-data]   : 429     
- [total]        : 137     
- [vars]         : 5       
+ [total]        : 129     
+ [vars]         : 6       
  binary         : 12      
- block          : 9       
+ block          : 8       
  break          : 3       
- call           : 3       
+ call           : 2       
  call_import    : 1       
  call_indirect  : 4       
- const          : 48      
+ const          : 45      
  drop           : 3       
  get_global     : 1       
- get_local      : 20      
- if             : 3       
+ get_local      : 18      
+ if             : 2       
  load           : 16      
  loop           : 1       
  set_global     : 1       
@@ -48,38 +48,7 @@ total
  (func $_malloc (; 2 ;) (type $2) (param $0 i32) (result i32)
   (i32.const 0)
  )
- (func $___stdio_write (; 3 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
-  (i32.store
-   (i32.const 8)
-   (get_local $1)
-  )
-  (i32.store
-   (i32.const 12)
-   (get_local $2)
-  )
-  (i32.store
-   (tee_local $1
-    (get_global $global$0)
-   )
-   (i32.const 1)
-  )
-  (i32.store offset=8
-   (get_local $1)
-   (i32.const 2)
-  )
-  (drop
-   (if (result i32)
-    (call $import$0
-     (i32.const 146)
-     (get_local $1)
-    )
-    (i32.const -1)
-    (i32.const 0)
-   )
-  )
-  (i32.const 1)
- )
- (func $_main (; 4 ;) (type $7) (result i32)
+ (func $_main (; 3 ;) (type $7) (result i32)
   (local $0 i32)
   (local $1 i32)
   (call $__ZNSt3__224__put_character_sequenceIcNS_11char_traitsIcEEEERNS_13basic_ostreamIT_T0_EES7_PKS4_j
@@ -112,17 +81,38 @@ total
   )
   (i32.const 0)
  )
- (func $___stdout_write (; 5 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+ (func $___stdout_write (; 4 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+  (local $3 i32)
   (set_global $global$0
    (i32.const 32)
   )
-  (call $___stdio_write
-   (i32.const 1)
+  (i32.store
+   (i32.const 8)
    (get_local $1)
+  )
+  (i32.store
+   (i32.const 12)
    (get_local $2)
   )
+  (i32.store
+   (tee_local $3
+    (get_global $global$0)
+   )
+   (i32.const 1)
+  )
+  (i32.store offset=8
+   (get_local $3)
+   (i32.const 2)
+  )
+  (drop
+   (call $import$0
+    (i32.const 146)
+    (get_local $3)
+   )
+  )
+  (i32.const 1)
  )
- (func $__ZNSt3__224__put_character_sequenceIcNS_11char_traitsIcEEEERNS_13basic_ostreamIT_T0_EES7_PKS4_j (; 6 ;) (type $3) (param $0 i32)
+ (func $__ZNSt3__224__put_character_sequenceIcNS_11char_traitsIcEEEERNS_13basic_ostreamIT_T0_EES7_PKS4_j (; 5 ;) (type $3) (param $0 i32)
   (local $1 i32)
   (set_local $1
    (i32.load offset=24
@@ -160,7 +150,7 @@ total
    )
   )
  )
- (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 7 ;) (type $3) (param $0 i32)
+ (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 6 ;) (type $3) (param $0 i32)
   (local $1 i32)
   (local $2 i32)
   (block $label$1
@@ -205,7 +195,7 @@ total
    )
   )
  )
- (func $__ZNSt3__211__stdoutbufIcE8overflowEi (; 8 ;) (type $0) (param $0 i32) (param $1 i32) (result i32)
+ (func $__ZNSt3__211__stdoutbufIcE8overflowEi (; 7 ;) (type $0) (param $0 i32) (param $1 i32) (result i32)
   (i32.store8
    (i32.const 0)
    (get_local $1)
@@ -230,7 +220,7 @@ total
   )
   (i32.const 0)
  )
- (func $__ZNSt3__211__stdoutbufIcE6xsputnEPKci (; 9 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+ (func $__ZNSt3__211__stdoutbufIcE6xsputnEPKci (; 8 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
   (drop
    (call_indirect (type $1)
     (i32.const 0)
@@ -250,22 +240,22 @@ total
  )
 )
 total
- [funcs]        : 9       
+ [funcs]        : 8       
  [memory-data]  : 28      
  [table-data]   : 429     
- [total]        : 136           -1
- [vars]         : 4             -1
+ [total]        : 128           -1
+ [vars]         : 5             -1
  binary         : 12      
- block          : 9       
+ block          : 8       
  break          : 3       
- call           : 3       
+ call           : 2       
  call_import    : 1       
  call_indirect  : 4       
- const          : 48      
+ const          : 45      
  drop           : 3       
  get_global     : 1       
- get_local      : 20      
- if             : 3       
+ get_local      : 18      
+ if             : 2       
  load           : 16      
  loop           : 1       
  set_global     : 1       
@@ -299,38 +289,7 @@ total
  (func $_malloc (; 2 ;) (type $2) (param $0 i32) (result i32)
   (i32.const 0)
  )
- (func $___stdio_write (; 3 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
-  (i32.store
-   (i32.const 8)
-   (get_local $1)
-  )
-  (i32.store
-   (i32.const 12)
-   (get_local $2)
-  )
-  (i32.store
-   (tee_local $1
-    (get_global $global$0)
-   )
-   (i32.const 1)
-  )
-  (i32.store offset=8
-   (get_local $1)
-   (i32.const 2)
-  )
-  (drop
-   (if (result i32)
-    (call $import$0
-     (i32.const 146)
-     (get_local $1)
-    )
-    (i32.const -1)
-    (i32.const 0)
-   )
-  )
-  (i32.const 1)
- )
- (func $_main (; 4 ;) (type $7) (result i32)
+ (func $_main (; 3 ;) (type $7) (result i32)
   (local $0 i32)
   (call $__ZNSt3__224__put_character_sequenceIcNS_11char_traitsIcEEEERNS_13basic_ostreamIT_T0_EES7_PKS4_j
    (block (result i32)
@@ -360,17 +319,38 @@ total
   )
   (i32.const 0)
  )
- (func $___stdout_write (; 5 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+ (func $___stdout_write (; 4 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+  (local $3 i32)
   (set_global $global$0
    (i32.const 32)
   )
-  (call $___stdio_write
-   (i32.const 1)
+  (i32.store
+   (i32.const 8)
    (get_local $1)
+  )
+  (i32.store
+   (i32.const 12)
    (get_local $2)
   )
+  (i32.store
+   (tee_local $3
+    (get_global $global$0)
+   )
+   (i32.const 1)
+  )
+  (i32.store offset=8
+   (get_local $3)
+   (i32.const 2)
+  )
+  (drop
+   (call $import$0
+    (i32.const 146)
+    (get_local $3)
+   )
+  )
+  (i32.const 1)
  )
- (func $__ZNSt3__224__put_character_sequenceIcNS_11char_traitsIcEEEERNS_13basic_ostreamIT_T0_EES7_PKS4_j (; 6 ;) (type $3) (param $0 i32)
+ (func $__ZNSt3__224__put_character_sequenceIcNS_11char_traitsIcEEEERNS_13basic_ostreamIT_T0_EES7_PKS4_j (; 5 ;) (type $3) (param $0 i32)
   (local $1 i32)
   (set_local $1
    (i32.load offset=24
@@ -408,7 +388,7 @@ total
    )
   )
  )
- (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 7 ;) (type $3) (param $0 i32)
+ (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 6 ;) (type $3) (param $0 i32)
   (local $1 i32)
   (local $2 i32)
   (block $label$1
@@ -453,7 +433,7 @@ total
    )
   )
  )
- (func $__ZNSt3__211__stdoutbufIcE8overflowEi (; 8 ;) (type $0) (param $0 i32) (param $1 i32) (result i32)
+ (func $__ZNSt3__211__stdoutbufIcE8overflowEi (; 7 ;) (type $0) (param $0 i32) (param $1 i32) (result i32)
   (i32.store8
    (i32.const 0)
    (get_local $1)
@@ -478,7 +458,7 @@ total
   )
   (i32.const 0)
  )
- (func $__ZNSt3__211__stdoutbufIcE6xsputnEPKci (; 9 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+ (func $__ZNSt3__211__stdoutbufIcE6xsputnEPKci (; 8 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
   (drop
    (call_indirect (type $1)
     (i32.const 0)
@@ -498,22 +478,22 @@ total
  )
 )
 total
- [funcs]        : 9       
+ [funcs]        : 8       
  [memory-data]  : 28      
  [table-data]   : 429     
- [total]        : 136     
- [vars]         : 4       
+ [total]        : 128     
+ [vars]         : 5       
  binary         : 12      
- block          : 9       
+ block          : 8       
  break          : 3       
- call           : 3       
+ call           : 2       
  call_import    : 1       
  call_indirect  : 4       
- const          : 48      
+ const          : 45      
  drop           : 3       
  get_global     : 1       
- get_local      : 20      
- if             : 3       
+ get_local      : 18      
+ if             : 2       
  load           : 16      
  loop           : 1       
  set_global     : 1       
@@ -547,38 +527,7 @@ total
  (func $_malloc (; 2 ;) (type $2) (param $0 i32) (result i32)
   (i32.const 0)
  )
- (func $___stdio_write (; 3 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
-  (i32.store
-   (i32.const 8)
-   (get_local $1)
-  )
-  (i32.store
-   (i32.const 12)
-   (get_local $2)
-  )
-  (i32.store
-   (tee_local $1
-    (get_global $global$0)
-   )
-   (i32.const 1)
-  )
-  (i32.store offset=8
-   (get_local $1)
-   (i32.const 2)
-  )
-  (drop
-   (if (result i32)
-    (call $import$0
-     (i32.const 146)
-     (get_local $1)
-    )
-    (i32.const -1)
-    (i32.const 0)
-   )
-  )
-  (i32.const 1)
- )
- (func $_main (; 4 ;) (type $7) (result i32)
+ (func $_main (; 3 ;) (type $7) (result i32)
   (local $0 i32)
   (call $__ZNSt3__224__put_character_sequenceIcNS_11char_traitsIcEEEERNS_13basic_ostreamIT_T0_EES7_PKS4_j
    (block (result i32)
@@ -608,17 +557,38 @@ total
   )
   (i32.const 0)
  )
- (func $___stdout_write (; 5 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+ (func $___stdout_write (; 4 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+  (local $3 i32)
   (set_global $global$0
    (i32.const 32)
   )
-  (call $___stdio_write
-   (i32.const 1)
+  (i32.store
+   (i32.const 8)
    (get_local $1)
+  )
+  (i32.store
+   (i32.const 12)
    (get_local $2)
   )
+  (i32.store
+   (tee_local $3
+    (get_global $global$0)
+   )
+   (i32.const 1)
+  )
+  (i32.store offset=8
+   (get_local $3)
+   (i32.const 2)
+  )
+  (drop
+   (call $import$0
+    (i32.const 146)
+    (get_local $3)
+   )
+  )
+  (i32.const 1)
  )
- (func $__ZNSt3__224__put_character_sequenceIcNS_11char_traitsIcEEEERNS_13basic_ostreamIT_T0_EES7_PKS4_j (; 6 ;) (type $3) (param $0 i32)
+ (func $__ZNSt3__224__put_character_sequenceIcNS_11char_traitsIcEEEERNS_13basic_ostreamIT_T0_EES7_PKS4_j (; 5 ;) (type $3) (param $0 i32)
   (local $1 i32)
   (set_local $1
    (i32.load offset=24
@@ -656,7 +626,7 @@ total
    )
   )
  )
- (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 7 ;) (type $3) (param $0 i32)
+ (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 6 ;) (type $3) (param $0 i32)
   (local $1 i32)
   (local $2 i32)
   (block $label$1
@@ -701,7 +671,7 @@ total
    )
   )
  )
- (func $__ZNSt3__211__stdoutbufIcE8overflowEi (; 8 ;) (type $0) (param $0 i32) (param $1 i32) (result i32)
+ (func $__ZNSt3__211__stdoutbufIcE8overflowEi (; 7 ;) (type $0) (param $0 i32) (param $1 i32) (result i32)
   (i32.store8
    (i32.const 0)
    (get_local $1)
@@ -726,7 +696,7 @@ total
   )
   (i32.const 0)
  )
- (func $__ZNSt3__211__stdoutbufIcE6xsputnEPKci (; 9 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+ (func $__ZNSt3__211__stdoutbufIcE6xsputnEPKci (; 8 ;) (type $1) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
   (drop
    (call_indirect (type $1)
     (i32.const 0)
