@@ -56,6 +56,7 @@
 #include <ir/find_all.h>
 #include <ir/manipulation.h>
 #include <ir/properties.h>
+#include <ir/utils.h>
 
 namespace wasm {
 
@@ -843,6 +844,8 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     // and perhaps more compressible. Finally, other optimizations may be more
     // effective if they see the set directly on the value being set.
     struct BlockContextOptimizer : public PostWalker<BlockContextOptimizer> {
+      bool needReFinalize = false;
+
       void visitSetLocal(SetLocal* curr) {
         Expression* changed = curr;
         optimize(changed);
@@ -853,14 +856,15 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
       void optimize(Expression*& child) {
         if (auto* set = child->template dynCast<SetLocal>()) {
           if (auto* block = set->value->template dynCast<Block>()) {
-            if (!block->name.is() && isConcreteType(block->type)) {
+            // If there might be breaks, a single set may not be enough.
+            if (!block->name.is()) {
               auto* last = block->list.back();
               set->value = last;
               set->finalize();
               block->list.back() = set;
               child = block;
               optimize(block->list.back());
-              block->finalize();
+              needReFinalize = true;
             }
           } else if (auto* loop = set->value->template dynCast<Loop>()) {
             set->value = loop->body;
@@ -868,7 +872,7 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
             loop->body = set;
             child = loop;
             optimize(loop->body);
-            loop->finalize();
+            needReFinalize = true;
           } else if (auto* iff = set->value->template dynCast<If>()) {
             if (iff->ifFalse) {
               if (isConcreteType(iff->ifTrue->type) && iff->ifFalse->type == unreachable) {
@@ -877,17 +881,23 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
                 iff->ifTrue = set;
                 child = iff;
                 optimize(iff->ifTrue);
-                iff->finalize();
+                needReFinalize = true;
               } else if (isConcreteType(iff->ifFalse->type) && iff->ifTrue->type == unreachable) {
                 set->value = iff->ifFalse;
                 set->finalize();
                 iff->ifFalse = set;
                 child = iff;
                 optimize(iff->ifFalse);
-                iff->finalize();
+                needReFinalize = true;
               }
             }
           }
+        }
+      }
+
+      void visitFunction(Function* curr) {
+        if (needReFinalize) {
+          ReFinalize().walk(curr->body);
         }
       }
     };
