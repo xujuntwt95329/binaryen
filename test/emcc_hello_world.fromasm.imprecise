@@ -15133,6 +15133,12 @@
          (get_local $1)
         )
        )
+       (set_local $0
+        (i32.add
+         (get_local $0)
+         (i32.const 1)
+        )
+       )
        (set_local $1
         (i32.add
          (get_local $1)
@@ -15142,12 +15148,6 @@
        (set_local $2
         (i32.sub
          (get_local $2)
-         (i32.const 1)
-        )
-       )
-       (set_local $0
-        (i32.add
-         (get_local $0)
          (i32.const 1)
         )
        )
@@ -15168,6 +15168,12 @@
          (get_local $1)
         )
        )
+       (set_local $0
+        (i32.add
+         (get_local $0)
+         (i32.const 4)
+        )
+       )
        (set_local $1
         (i32.add
          (get_local $1)
@@ -15177,12 +15183,6 @@
        (set_local $2
         (i32.sub
          (get_local $2)
-         (i32.const 4)
-        )
-       )
-       (set_local $0
-        (i32.add
-         (get_local $0)
          (i32.const 4)
         )
        )
@@ -15205,6 +15205,12 @@
        (get_local $1)
       )
      )
+     (set_local $0
+      (i32.add
+       (get_local $0)
+       (i32.const 1)
+      )
+     )
      (set_local $1
       (i32.add
        (get_local $1)
@@ -15214,12 +15220,6 @@
      (set_local $2
       (i32.sub
        (get_local $2)
-       (i32.const 1)
-      )
-     )
-     (set_local $0
-      (i32.add
-       (get_local $0)
        (i32.const 1)
       )
      )

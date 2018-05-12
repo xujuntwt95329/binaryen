@@ -148,6 +148,7 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   add("vacuum"); // previous pass creates garbage
   add("reorder-locals");
   add("remove-unused-brs"); // simplify-locals opens opportunities for optimizations
+  add("merge-blocks");
   // if we are willing to work hard, also optimize copies before coalescing
   if (options.optimizeLevel >= 3 || options.shrinkLevel >= 2) {
     add("merge-locals"); // very slow on e.g. sqlite
