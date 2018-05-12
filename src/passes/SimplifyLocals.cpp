@@ -456,7 +456,7 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     if (breaks.empty()) {
       // No breaks with values to here. If there is something sinkable, and there are no
       // breaks, then so this is simple to handle: sink one of them.
-      if (!sinkables.empty() && !block->name.is()) {
+      if (!sinkables.empty() && !block->name.is() && !getenv("NONO")) {
         // If we added helper blocks, then this might be one of them, but if we
         // optimize it that would be premature: the better result is to optimize
         // the outer if or block, so do nothing here, but request another cycle

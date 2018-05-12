@@ -410,7 +410,7 @@
     (loop $label$2
      (br $label$2)
     )
-    (set_local $var$3
+    (drop
      (get_local $var$3)
     )
    )

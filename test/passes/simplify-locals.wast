@@ -1129,4 +1129,97 @@
    )
    (i32.const 0)
   )
+  (func $ff (param $x f32) (result f32)
+   (unreachable)
+  )
+  (func $flow-one-if-side-a (param $var$0 i32) (param $var$1 i64) (param $var$2 f64) (param $var$3 f32) (param $var$4 f64)
+   (local $var$5 i32)
+   (local $var$6 i64)
+   (drop
+    (call $ff
+     (loop $label$1 (result f32)
+      (if
+       (tee_local $var$5
+        (i32.const 0)
+       )
+       (unreachable)
+       (loop $label$4
+        (drop
+         (f32.const 1)
+        )
+        (br_if $label$4
+         (i32.const 0)
+        )
+        (set_local $var$1
+         (tee_local $var$6
+          (get_local $var$1)
+         )
+        )
+       )
+      )
+      (br_if $label$1
+       (if (result i32)
+        (get_local $var$5)
+        (block (result i32)
+         (set_local $var$6
+          (i64.shr_s
+           (i64.const 1)
+           (get_local $var$6)
+          )
+         )
+         (unreachable)
+        )
+        (i32.const 0)
+       )
+      )
+      (f32.const 1)
+     )
+    )
+   )
+  )
+  (func $flow-one-if-side-b (param $var$0 i32) (param $var$1 i64) (param $var$2 f64) (param $var$3 f32) (param $var$4 f64)
+   (local $var$5 i32)
+   (local $var$6 i64)
+   (drop
+    (call $ff
+     (loop $label$1 (result f32)
+      (if
+       (tee_local $var$5
+        (i32.const 0)
+       )
+       (loop $label$4
+        (drop
+         (f32.const 1)
+        )
+        (br_if $label$4
+         (i32.const 0)
+        )
+        (set_local $var$1
+         (tee_local $var$6
+          (get_local $var$1)
+         )
+        )
+       )
+       (unreachable)
+      )
+      (br_if $label$1
+       (if (result i32)
+        (get_local $var$5)
+        (block (result i32)
+         (set_local $var$6
+          (i64.shr_s
+           (i64.const 1)
+           (get_local $var$6)
+          )
+         )
+         (unreachable)
+        )
+        (i32.const 0)
+       )
+      )
+      (f32.const 1)
+     )
+    )
+   )
+  )
 )

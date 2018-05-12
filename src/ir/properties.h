@@ -152,14 +152,27 @@ inline Expression* getFlowingValue(Expression* curr) {
     if (auto* block = curr->dynCast<Block>()) {
       assert(!block->list.empty());
       curr = block->list.back();
+      continue;
     } else if (auto* loop = curr->dynCast<Loop>()) {
       curr = loop->body;
+      continue;
+    } else if (auto* iff = curr->dynCast<If>()) {
+      if (iff->ifFalse) {
+        if (iff->ifTrue->type == unreachable) {
+          curr = iff->ifFalse;
+          continue;
+        }
+        if (iff->ifFalse->type == unreachable) {
+          curr = iff->ifTrue;
+          continue;
+        }
+      }
     } else if (auto* set = curr->dynCast<SetLocal>()) {
       assert(set->isTee());
       curr = set->value;
-    } else {
-      return curr;
+      continue;
     }
+    return curr;
   }
 }
 
