@@ -22,7 +22,6 @@
   (drop
    (get_local $y)
   )
-  (nop)
   (drop
    (get_local $y)
   )
@@ -42,7 +41,6 @@
   (drop
    (get_local $x)
   )
-  (nop)
   (drop
    (get_local $x)
   )
@@ -100,7 +98,6 @@
   (set_local $z
    (i32.const 2)
   )
-  (nop)
   (drop
    (get_local $x)
   )
@@ -153,43 +150,40 @@
     )
     (block (result i32)
      (nop)
-     (block (result i32)
-      (nop)
-      (nop)
-      (get_local $x)
-     )
+     (nop)
+     (get_local $x)
     )
    )
   )
  )
  (func $block-just-one (; 7 ;) (type $4) (param $x i32) (result i32)
-  (nop)
-  (drop
-   (i32.const 30)
-  )
-  (block (result i32)
+  (block
    (drop
     (i32.const 10)
    )
    (nop)
-   (i32.const 20)
   )
- )
- (func $block-just-one-loop (; 8 ;) (type $4) (param $x i32) (result i32)
-  (nop)
   (drop
    (i32.const 30)
   )
-  (loop $l (result i32)
+  (i32.const 20)
+ )
+ (func $block-just-one-loop (; 8 ;) (type $4) (param $x i32) (result i32)
+  (loop $l
    (drop
     (i32.const 10)
    )
    (br_if $l
     (i32.const 15)
    )
-   (nop)
-   (i32.const 20)
+   (set_local $x
+    (i32.const 20)
+   )
   )
+  (drop
+   (i32.const 30)
+  )
+  (get_local $x)
  )
  (func $one-break-one-sinkable (; 9 ;) (type $5) (param $var$0 i32)
   (block $label$1
@@ -202,20 +196,18 @@
   )
  )
  (func $one-sinkable-has-value (; 10 ;) (type $4) (param $var$0 i32) (result i32)
-  (nop)
-  (block (result i32)
+  (block
    (nop)
    (nop)
-   (i32.const 1)
   )
+  (i32.const 1)
  )
  (func $simple-block-sink (; 11 ;) (type $0)
   (local $var$1 i32)
-  (nop)
-  (nop)
   (drop
    (i32.const 14)
   )
+  (nop)
  )
  (func $almost-simple-block-sink (; 12 ;) (type $5) (param $a i32)
   (local $b i32)
@@ -226,12 +218,11 @@
  )
  (func $yes-simple-block-sink (; 13 ;) (type $5) (param $a i32)
   (local $b i32)
-  (nop)
-  (call $almost-simple-block-sink
-   (get_local $a)
-  )
   (drop
    (i32.const 14)
+  )
+  (call $almost-simple-block-sink
+   (get_local $a)
   )
  )
  (func $flow-throw-many (; 14 ;) (type $6) (param $var$0 i32) (result f32)
@@ -365,7 +356,6 @@
     (i32.const 3)
    )
   )
-  (nop)
   (if
    (i32.const 1)
    (set_local $x
@@ -393,7 +383,6 @@
     (i32.const 3)
    )
   )
-  (nop)
   (set_local $x
    (if (result i32)
     (i32.const 1)
@@ -426,7 +415,6 @@
      (i32.const 1)
      (unreachable)
     )
-    (nop)
     (if
      (block (result i32)
       (if

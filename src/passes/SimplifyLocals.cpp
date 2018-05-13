@@ -455,8 +455,12 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
     }
     if (breaks.empty()) {
       // No breaks with values to here. If there is something sinkable, and there are no
-      // breaks, then so this is simple to handle: sink one of them.
-      if (!sinkables.empty() && !block->name.is() && !getenv("NONO")) {
+      // breaks, then so this is simple to handle: sink one of them. However,
+      // in practice this helps very very rarely - we must be able to do something
+      // especially useful with the set outside the block that this creates. For now,
+      // leave this off. TODO: investigate more perhaps?
+#if 0
+      if (!sinkables.empty() && !block->name.is()) {
         // If we added helper blocks, then this might be one of them, but if we
         // optimize it that would be premature: the better result is to optimize
         // the outer if or block, so do nothing here, but request another cycle
@@ -475,6 +479,7 @@ struct SimplifyLocals : public WalkerPass<LinearExecutionWalker<SimplifyLocals<a
         }
         anotherCycle = true;
       }
+#endif
       return;
     }
     assert(breaks.size() > 0);
