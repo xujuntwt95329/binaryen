@@ -151,8 +151,11 @@ inline Expression* getFlowingValue(Expression* curr) {
   while (1) {
     if (auto* block = curr->dynCast<Block>()) {
       assert(!block->list.empty());
-      curr = block->list.back();
-      continue;
+      // If the block has a name, there may be breaks and so not a single flowing value.
+      if (!block->name.is()) {
+        curr = block->list.back();
+        continue;
+      }
     } else if (auto* loop = curr->dynCast<Loop>()) {
       curr = loop->body;
       continue;

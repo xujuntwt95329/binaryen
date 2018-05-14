@@ -329,5 +329,29 @@
     (br $label$1)
    )
   )
+  (func $block-with-other-break-so-last-not-flowing (param $0 f32) (param $1 f32) (param $2 i32) (param $3 f32) (result i32)
+   (set_local $2
+    (block $label$1 (result i32)
+     (loop $label$2
+      (br_if $label$2
+       (br_if $label$1
+        (i32.const -68)
+        (i32.eqz
+         (get_local $2)
+        )
+       )
+      )
+     )
+     (get_local $2)
+    )
+   )
+   (if
+    (i32.eqz
+     (i32.const 1)
+    )
+    (unreachable)
+   )
+   (get_local $2)
+  )
 )
 
