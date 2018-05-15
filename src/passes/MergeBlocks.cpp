@@ -28,6 +28,28 @@
 // the inner block become a single expression, and usually outer
 // blocks are larger anyhow. (This also helps readability.)
 //
+
+  (loop $label$1
+   (set_global $global$0
+    (i32.const 0)
+   )
+   (if
+    (get_global $global$0)
+    (block
+     (set_global $global$0
+      (i32.const 0)
+     )
+     (br $label$1)
+    )
+    (set_local $var$1
+     (f32.const -17179869184)
+    )
+   )
+  )
+  (get_local $var$1)
+
+ - we actually want to keep the get_local in the innermost position, where other passes can see it is worth fusing with the if...
+
 // We also restructure blocks in order to enable such merging. For
 // example,
 //
