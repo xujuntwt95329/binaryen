@@ -76,16 +76,16 @@ struct FunctionInfo {
   }
 
   bool worthInlining(PassOptions& options) {
-    // if it's big, it's just not worth doing (TODO: investigate more)
-    if (size > FLEXIBLE_SIZE_LIMIT) return false;
+    bool inlineableSingleUse = calls == 1 && !usedGlobally;
+    // if it's big and multi-use, it's just not worth doing
+    if (!inlineableSingleUse && size > FLEXIBLE_SIZE_LIMIT) return false;
     // if it's so small we have a guarantee that after we optimize the
     // size will not increase, inline it
     if (size <= INLINING_OPTIMIZING_WILL_DECREASE_SIZE_LIMIT) return true;
     // if it has one use, then inlining it would likely reduce code size
     // since we are just moving code around, + optimizing, so worth it
     // if small enough that we are pretty sure its ok
-    if (calls == 1 && !usedGlobally && size <= CAREFUL_SIZE_LIMIT) return true;
-    // more than one use, so we can't eliminate it after inlining,
+    if (inlineableSingleUse && size <= CAREFUL_SIZE_LIMIT) return true;
     // so only worth it if we really care about speed and don't care
     // about size, and if it's lightweight so a good candidate for
     // speeding us up.
