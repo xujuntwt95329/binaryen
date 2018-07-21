@@ -96,7 +96,7 @@ struct Flower : public CFGWalker<Flower, Visitor<Flower>, Info> {
     std::vector<FlowBlock> flowBlocks;
     flowBlocks.resize(basicBlocks.size());
 
-    // Init mapping between basicblocks and flowBlocks
+    // Init mapping between basicblocks and flowBlocks.
     std::unordered_map<BasicBlock*, FlowBlock*> basicToFlowMap;
     for (Index i = 0; i < basicBlocks.size(); ++i) {
       basicToFlowMap[basicBlocks[i].get()] = &flowBlocks[i];
@@ -114,10 +114,40 @@ struct Flower : public CFGWalker<Flower, Visitor<Flower>, Info> {
       flowBlock.actions.swap(block->contents.actions);
       // Map in block to flow blocks
       auto& in = block->in;
-      flowBlock.in.resize(in.size());
-      std::transform(in.begin(), in.end(), flowBlock.in.begin(), [&](BasicBlock* block) {
-        return basicToFlowMap[block];
-      });
+      // Compute the inputs to this flowBlock. While doing so, we
+      // compact the graph: for flow purposes, we just care about finding
+      // the sets for some gets. That means we can skip through blocks with
+      // no sets. To skip, we just replace the block with its predecessors.
+      // However, if there are numerous predecessors, this may lead to
+      // a large amount of connections, so we avoid that.
+      std::set<BasicBlock*> added;
+      std::vector<BasicBlock*> progress;
+      // Start with the initial inputs to the original block.
+      for (auto* i : in) {
+        added.insert(i);
+        progress.push_back(i);
+      }
+      while (!progress.empty()) {
+        auto* curr = progress.back();
+        progress.pop_back();
+        // If this block has sets, or it's a dead end (which means
+        // it could be the entry, which would mean we need to add it
+        // so that we get initial values), then add the block and
+        // stop flowing.
+        if (!curr->contents.lastSets.empty() ||
+            curr->in.empty()) {
+          // This has sets, just add it.
+          flowBlock.in.push_back(basicToFlowMap[curr]);
+        } else {
+          // Compact through this set-less block.
+          for (auto* i : curr->in) {
+            if (!added.count(i)) {
+              added.insert(i);
+              progress.push_back(i);
+            }
+          }
+        }
+      }
       // Convert unordered_map to vector.
       flowBlock.lastSets.reserve(block->contents.lastSets.size());
       for (auto set : block->contents.lastSets) {
