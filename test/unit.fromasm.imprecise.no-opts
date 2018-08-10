@@ -1947,7 +1947,7 @@
  )
  (func $f2u (; 70 ;) (param $x f64) (result i32)
   (return
-   (i32.trunc_u/f64
+   (i32.trunc_s/f64
     (get_local $x)
    )
   )

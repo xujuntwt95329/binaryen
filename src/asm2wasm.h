@@ -1816,17 +1816,12 @@ Function* Asm2WasmBuilder::processFunction(Ref ast) {
         if (ast[2]->isArray(UNARY_PREFIX) && ast[2][1] == B_NOT) {
           // if we have an unsigned coercion on us, it is an unsigned op
           Expression* expr = process(ast[2][2]);
-          bool isSigned = !isParentUnsignedCoercion(astStackHelper.getParent());
           bool isF64 = expr->type == f64;
           UnaryOp op;
-          if (isSigned && isF64) {
+          if (isF64) {
             op = UnaryOp::TruncSFloat64ToInt32;
-          } else if (isSigned && !isF64) {
+          } else {
             op = UnaryOp::TruncSFloat32ToInt32;
-          } else if (!isSigned && isF64) {
-            op = UnaryOp::TruncUFloat64ToInt32;
-          } else { // !isSigned && !isF64
-            op = UnaryOp::TruncUFloat32ToInt32;
           }
           return makeTrappingUnary(builder.makeUnary(op, expr), trappingFunctions);
         }

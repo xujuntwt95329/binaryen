@@ -1182,33 +1182,7 @@
    )
   )
  )
- (func $f64-to-uint (; 55 ;) (; has Stack IR ;) (param $0 f64) (result i32)
-  (if (result i32)
-   (f64.ne
-    (get_local $0)
-    (get_local $0)
-   )
-   (i32.const 0)
-   (if (result i32)
-    (f64.ge
-     (get_local $0)
-     (f64.const 4294967296)
-    )
-    (i32.const 0)
-    (if (result i32)
-     (f64.le
-      (get_local $0)
-      (f64.const -1)
-     )
-     (i32.const 0)
-     (i32.trunc_u/f64
-      (get_local $0)
-     )
-    )
-   )
-  )
- )
- (func $keepAlive (; 56 ;) (; has Stack IR ;)
+ (func $keepAlive (; 55 ;) (; has Stack IR ;)
   (drop
    (call $sqrts
     (f64.const 3.14159)
@@ -1220,7 +1194,7 @@
    )
   )
   (drop
-   (call $f64-to-uint
+   (call $f64-to-int
     (f64.const 100)
    )
   )
@@ -1257,13 +1231,13 @@
    )
   )
  )
- (func $vi (; 57 ;) (; has Stack IR ;) (param $0 i32)
+ (func $vi (; 56 ;) (; has Stack IR ;) (param $0 i32)
   (nop)
  )
- (func $ii (; 58 ;) (; has Stack IR ;) (param $0 i32) (result i32)
+ (func $ii (; 57 ;) (; has Stack IR ;) (param $0 i32) (result i32)
   (get_local $0)
  )
- (func $legalstub$conversions (; 59 ;) (; has Stack IR ;) (param $0 i32) (param $1 f64) (param $2 f64)
+ (func $legalstub$conversions (; 58 ;) (; has Stack IR ;) (param $0 i32) (param $1 f64) (param $2 f64)
   (drop
    (call $f64-to-int
     (get_local $1)
@@ -1277,7 +1251,7 @@
    )
   )
  )
- (func $legalstub$frem_float (; 60 ;) (; has Stack IR ;) (result f64)
+ (func $legalstub$frem_float (; 59 ;) (; has Stack IR ;) (result f64)
   (f64.promote/f32
    (f32.demote/f64
     (call $f64-rem
@@ -1287,16 +1261,16 @@
    )
   )
  )
- (func $legalstub$fr (; 61 ;) (; has Stack IR ;) (param $0 f64)
+ (func $legalstub$fr (; 60 ;) (; has Stack IR ;) (param $0 f64)
   (nop)
  )
- (func $legalstub$ceiling_32_64 (; 62 ;) (; has Stack IR ;) (param $0 f64) (param $1 f64)
+ (func $legalstub$ceiling_32_64 (; 61 ;) (; has Stack IR ;) (param $0 f64) (param $1 f64)
   (nop)
  )
- (func $legalstub$bitcasts (; 63 ;) (; has Stack IR ;) (param $0 i32) (param $1 f64)
+ (func $legalstub$bitcasts (; 62 ;) (; has Stack IR ;) (param $0 i32) (param $1 f64)
   (nop)
  )
- (func $legalstub$exported_f32_user (; 64 ;) (; has Stack IR ;) (param $0 i32) (param $1 f64) (param $2 f64) (result f64)
+ (func $legalstub$exported_f32_user (; 63 ;) (; has Stack IR ;) (param $0 i32) (param $1 f64) (param $2 f64) (result f64)
   (f64.promote/f32
    (f32.demote/f64
     (get_local $1)
