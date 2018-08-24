@@ -41,6 +41,7 @@
 #include <wasm-builder.h>
 #include <cfg/cfg-traversal.h>
 #include <ir/effects.h>
+#include <ir/properties.h>
 #include <passes/opt-utils.h>
 #include <support/sorted_vector.h>
 
@@ -52,6 +53,12 @@ struct DAEFunctionInfo {
   SortedVector unusedParams;
   // Maps a function name to the calls going to it.
   std::unordered_map<Name, std::vector<Call*>> calls;
+  // The calls which are dropped (i.e., their return values ignored).
+  std::unordered_set<Call*> droppedCalls;
+  // All the constants that we return, including one with.
+  std::unordered_set<Literal> returnedConsts;
+  // Whether we return anything other than a const.
+  bool returnsNonConst = false;
   // Whether the function can be called from places that
   // affect what we can do. For now, any call we don't
   // see inhibits our optimizations, but TODO: an export
@@ -113,12 +120,36 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
     info->calls[curr->target].push_back(curr);
   }
 
+  void visitCall(Drop* curr) {
+    if (auto* call = curr->dynCast<Call>()) {
+      info->droppedCalls.insert(Properties::getFallthrough(call));
+    }
+  }
+
+  void visitReturn(Return* curr) {
+    if (curr->value) {
+      noteReturnedValue(curr->value);
+    }
+  }
+
+  void noteReturnedValue(Expression* curr) {
+    if (auto* c = Properties::getFallthrough(curr)->dynCast<Const>()) {
+      info->returnedConsts.insert(c->value);
+    } else if (curr->type != unreachable) {
+      info->returnsNonConst = true;
+    }
+  }
+
   // main entry point
 
   void doWalkFunction(Function* func) {
     numParams = func->getNumParams();
     info = &((*infoMap)[func->name]);
     CFGWalker<DAEScanner, Visitor<DAEScanner>, DAEBlockInfo>::doWalkFunction(func);
+    // Note a value falling through, if there is one.
+    if (func->result != none) {
+      noteReturnedValue(func->body);
+    }
     // If there are relevant params, check if they are used. (If
     // we can't optimize the function anyhow, there's no point.)
     if (numParams > 0 && !info->hasUnseenCalls) {
