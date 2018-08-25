@@ -134,7 +134,14 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
   }
 
   void noteReturnedValue(Expression* curr) {
-    if (auto* c = Properties::getFallthrough(curr)->dynCast<Const>()) {
+    // Look at the actual falling-through value. Note that this helps
+    // handle cases like
+    //  (block (result i32)
+    //    (unreachable)
+    //  )
+    // (A block marked as i32, but having no actual falling-through value.)
+    curr = Properties::getFallthrough(curr);
+    if (auto* c = curr->dynCast<Const>()) {
       info->returnedConsts.insert(c->value);
     } else if (curr->type != unreachable) {
       info->returnsNonConst = true;

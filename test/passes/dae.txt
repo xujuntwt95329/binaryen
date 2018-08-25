@@ -247,4 +247,24 @@
    (call $c3)
   )
  )
+ (func $c4 (; 35 ;) (type $3) (result i32)
+  (if
+   (i32.const 1)
+   (nop)
+   (return
+    (i32.const 8)
+   )
+  )
+  (unreachable)
+ )
+ (func $d4 (; 36 ;) (type $1)
+  (drop
+   (block (result i32)
+    (drop
+     (call $c4)
+    )
+    (i32.const 8)
+   )
+  )
+ )
 )

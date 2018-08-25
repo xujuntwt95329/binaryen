@@ -114,6 +114,16 @@
   (func $d3
     (drop (call $c3))
   )
+  (func $c4 (result i32)
+    (if (i32.const 1)
+      (nop)
+      (return (i32.const 8))
+    )
+    (unreachable)
+  )
+  (func $d4
+    (drop (call $c4))
+  )
 ;; recursion
 )
 
