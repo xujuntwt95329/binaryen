@@ -267,4 +267,17 @@
    )
   )
  )
+ (func $c5 (; 37 ;) (type $3) (result i32)
+  (drop
+   (block (result i32)
+    (drop
+     (call $c5)
+    )
+    (i32.const 9)
+   )
+  )
+  (return
+   (i32.const 9)
+  )
+ )
 )

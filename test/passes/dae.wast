@@ -124,6 +124,9 @@
   (func $d4
     (drop (call $c4))
   )
-;; recursion
+  (func $c5 (result i32)
+    (drop (call $c5)) ;; recursion
+    (return (i32.const 9))
+  )
 )
 
