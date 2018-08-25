@@ -373,6 +373,8 @@ struct DAE : public Pass {
           builder.makeDrop(call),
           builder.makeConst(value)
         );
+// XXX instead of callp etc. stuff, run a pass for this - we run
+//     passes to optimize later anyhow in those places, so not too bad, and simpler.
         changed.insert(module->getFunction(callFunctions[call]));
       }
     }
