@@ -105,6 +105,15 @@
   (func $d2
     (drop (call $c2))
   )
+  (func $c3 (result i32)
+    (if (i32.const 1)
+      (return (i32.const 7))
+      (return (i32.const 8))
+    )
+  )
+  (func $d3
+    (drop (call $c3))
+  )
 ;; recursion
 )
 

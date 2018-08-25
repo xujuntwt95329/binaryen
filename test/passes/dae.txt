@@ -231,4 +231,20 @@
    )
   )
  )
+ (func $c3 (; 33 ;) (type $3) (result i32)
+  (if
+   (i32.const 1)
+   (return
+    (i32.const 7)
+   )
+   (return
+    (i32.const 8)
+   )
+  )
+ )
+ (func $d3 (; 34 ;) (type $1)
+  (drop
+   (call $c3)
+  )
+ )
 )
