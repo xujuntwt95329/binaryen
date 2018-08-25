@@ -1,0 +1,32 @@
+(module
+ (type $0 (func (result i32)))
+ (type $1 (func))
+ (func $c5 (; 0 ;) (type $0) (result i32)
+  (return
+   (i32.const 8)
+  )
+ )
+ (func $d5 (; 1 ;) (type $1)
+  (drop
+   (block (result i32)
+    (drop
+     (call $c5)
+    )
+    (i32.const 8)
+   )
+  )
+ )
+ (func $c6 (; 2 ;) (type $0) (result i32)
+  (i32.const 9)
+ )
+ (func $d6 (; 3 ;) (type $1)
+  (drop
+   (block (result i32)
+    (drop
+     (call $c6)
+    )
+    (i32.const 9)
+   )
+  )
+ )
+)
