@@ -128,7 +128,7 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
 
   static void doVisitCall(DAEScanner* self, Expression** currp) {
     auto* call = (*currp)->cast<Call>();
-    self->info->calls[curr->target].push_back(currp);
+    self->info->calls[call->target].push_back(currp);
   }
 
   void visitCall(Drop* curr) {
@@ -272,7 +272,7 @@ struct DAE : public Pass {
         auto& allCallsToName = allCalls[name];
         allCallsToName.insert(allCallsToName.end(), calls.begin(), calls.end());
       }
-      droppedCalls.insert(info.droppedCalls.begin(), info.droppedCalls.end());
+      allDroppedCalls.insert(info.droppedCalls.begin(), info.droppedCalls.end());
     }
     // We now have a mapping of all call sites for each function. Check which
     // are always passed the same constant for a particular argument.
@@ -366,14 +366,15 @@ struct DAE : public Pass {
       auto value = infoMap[name].getReturnedConst();
       for (auto* callp : calls) {
         auto* call = (*callp)->cast<Call>();
-        if (droppedCalls.count(call) == 0)) {
+        if (allDroppedCalls.count(call) == 0) {
           // The target returns a const, and this call site is not dropped,
           // so we can propagate the constant!
           Builder builder(*module);
-          *currp = builder.makeSequence(
+          *callp = builder.makeSequence(
             builder.makeDrop(call),
             builder.makeConst(value)
           );
+          // TODO: add modified function to changed
         }
       }
     }
