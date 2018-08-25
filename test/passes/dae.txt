@@ -210,4 +210,25 @@
    )
   )
  )
+ (func $c2 (; 31 ;) (type $3) (result i32)
+  (if
+   (i32.const 1)
+   (return
+    (i32.const 6)
+   )
+   (return
+    (i32.const 6)
+   )
+  )
+ )
+ (func $d2 (; 32 ;) (type $1)
+  (drop
+   (block (result i32)
+    (drop
+     (call $c2)
+    )
+    (i32.const 6)
+   )
+  )
+ )
 )
