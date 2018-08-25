@@ -128,5 +128,18 @@
     (drop (call $c5)) ;; recursion
     (return (i32.const 9))
   )
+  (func $c6 (param $x i32) (result i32)
+    (drop (call $c6 (call $c6 (call $c6 (i32.const 1)))))
+    (i32.const 2)
+  )
+  (func $c7 (param $x i32) (result i32)
+    (drop (call $c7 (call $c7 (call $c7 (i32.const 1)))))
+    (i32.const 3)
+  )
+  (func $c8 (param $x i32) (result i32)
+    (drop (call $c6 (call $c7 (call $c8 (i32.const 1)))))
+    (drop (call $c8 (call $c7 (call $c6 (i32.const 1)))))
+    (i32.const 4)
+  )
 )
 
