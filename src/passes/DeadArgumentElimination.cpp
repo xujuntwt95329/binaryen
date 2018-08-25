@@ -52,8 +52,10 @@ struct DAEFunctionInfo {
   // The unused parameters, if any.
   SortedVector unusedParams;
   // Maps a function name to the calls going to it.
-  std::unordered_map<Name, std::vector<Call*>> calls;
-  // The calls which are dropped (i.e., their return values ignored).
+  std::unordered_map<Name, std::vector<Expression**>> calls;
+  // The calls which are dropped, i.e., their return values ignored.
+  // This helps us avoid propagating a return value if it is not
+  // used.
   std::unordered_set<Call*> droppedCalls;
   // All the constants that we return, including one with.
   std::unordered_set<Literal> returnedConsts;
@@ -66,11 +68,11 @@ struct DAEFunctionInfo {
   // adds the parameter.
   bool hasUnseenCalls = false;
 
-  bool returnsConstant() {
+  bool returnsConst() {
     return returnedConsts.size() == 1 && !returnsNonConst;
   }
 
-  Literal getReturnedConstant() {
+  Literal getReturnedConst() {
     return *returnedConsts.begin();
   }
 };
@@ -124,13 +126,14 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
     }
   }
 
-  void visitCall(Call* curr) {
-    info->calls[curr->target].push_back(curr);
+  static void doVisitCall(DAEScanner* self, Expression** currp) {
+    auto* call = (*currp)->cast<Call>();
+    self->info->calls[curr->target].push_back(currp);
   }
 
   void visitCall(Drop* curr) {
-    if (auto* call = curr->dynCast<Call>()) {
-      info->droppedCalls.insert(Properties::getFallthrough(call));
+    if (auto* call = Properties::getFallthrough(curr->value)->dynCast<Call>()) {
+      info->droppedCalls.insert(call);
     }
   }
 
@@ -259,7 +262,8 @@ struct DAE : public Pass {
       runner.run();
     }
     // Combine all the info.
-    std::unordered_map<Name, std::vector<Call*>> allCalls;
+    std::unordered_map<Name, std::vector<Expression**>> allCalls;
+    std::unordered_set<Call*> allDroppedCalls;
     for (auto& pair : infoMap) {
       auto& info = pair.second;
       for (auto& pair : info.calls) {
@@ -268,6 +272,7 @@ struct DAE : public Pass {
         auto& allCallsToName = allCalls[name];
         allCallsToName.insert(allCallsToName.end(), calls.begin(), calls.end());
       }
+      droppedCalls.insert(info.droppedCalls.begin(), info.droppedCalls.end());
     }
     // We now have a mapping of all call sites for each function. Check which
     // are always passed the same constant for a particular argument.
@@ -281,7 +286,8 @@ struct DAE : public Pass {
       auto numParams = func->getNumParams();
       for (Index i = 0; i < numParams; i++) {
         Literal value;
-        for (auto* call : calls) {
+        for (auto* callp : calls) {
+          auto* call = (*callp)->cast<Call>();
           assert(call->target == name);
           assert(call->operands.size() == numParams);
           auto* operand = call->operands[i];
@@ -331,7 +337,8 @@ struct DAE : public Pass {
           // effects, as that would prevent us removing them (flattening should
           // have been done earlier).
           bool canRemove = true;
-          for (auto* call : calls) {
+          for (auto* callp : calls) {
+            auto* call = (*callp)->cast<Call>();
             auto* operand = call->operands[i];
             if (EffectAnalyzer(runner->options, operand).hasSideEffects()) {
               canRemove = false;
@@ -349,15 +356,35 @@ struct DAE : public Pass {
         i--;
       }
     }
-    // Finally, propagate returned values: 
-
+    // Finally, propagate returned values: if a function is known to return
+    // a constant, replace calls to it with (call, constant), relying on
+    // the general optimization passes to benefit from that constant.
+    for (auto& pair : allCalls) {
+      auto name = pair.first;
+      if (!infoMap[name].returnsConst()) continue;
+      auto& calls = pair.second;
+      auto value = infoMap[name].getReturnedConst();
+      for (auto* callp : calls) {
+        auto* call = (*callp)->cast<Call>();
+        if (droppedCalls.count(call) == 0)) {
+          // The target returns a const, and this call site is not dropped,
+          // so we can propagate the constant!
+          Builder builder(*module);
+          *currp = builder.makeSequence(
+            builder.makeDrop(call),
+            builder.makeConst(value)
+          );
+        }
+      }
+    }
+    // If optimizing, optimize what we changed.
     if (optimize && changed.size() > 0) {
       OptUtils::optimizeAfterInlining(changed, module, runner);
     }
   }
 
 private:
-  void removeParameter(Function* func, Index i, std::vector<Call*> calls) {
+  void removeParameter(Function* func, Index i, std::vector<Expression**> calls) {
     // Clear the type, which is no longer accurate.
     func->type = Name();
     // It's cumbersome to adjust local names - TODO don't clear them?
@@ -390,7 +417,8 @@ private:
       }
     } localUpdater(func, i, newIndex);
     // Remove the arguments from the calls.
-    for (auto* call : calls) {
+    for (auto* callp : calls) {
+      auto* call = (*callp)->cast<Call>();
       call->operands.erase(call->operands.begin() + i);
     }
   }
