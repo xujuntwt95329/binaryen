@@ -2,6 +2,7 @@
  (type $0 (func (param i32)))
  (type $1 (func))
  (type $2 (func (param i32 f64)))
+ (type $3 (func (result i32)))
  (table 1 1 anyfunc)
  (elem (i32.const 0) $a9)
  (export "a8" (func $a8))
@@ -169,6 +170,29 @@
   )
   (call $a12
    (i32.const 2)
+  )
+ )
+ (func $c (; 27 ;) (type $3) (result i32)
+  (i32.const 1234)
+ )
+ (func $d (; 28 ;) (type $1)
+  (drop
+   (block (result i32)
+    (drop
+     (call $c)
+    )
+    (i32.const 1234)
+   )
+  )
+  (drop
+   (i32.eqz
+    (block (result i32)
+     (drop
+      (call $c)
+     )
+     (i32.const 1234)
+    )
+   )
   )
  )
 )

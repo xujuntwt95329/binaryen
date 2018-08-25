@@ -83,5 +83,12 @@
     (call $a12 (i32.const 1))
     (call $a12 (i32.const 2))
   )
+  (func $c (result i32)
+    (i32.const 1234)
+  )
+  (func $d
+    (drop (call $c))
+    (drop (i32.eqz (call $c)))
+  )
 )
 

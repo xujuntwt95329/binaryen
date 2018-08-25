@@ -53,10 +53,6 @@ struct DAEFunctionInfo {
   SortedVector unusedParams;
   // Maps a function name to the calls going to it.
   std::unordered_map<Name, std::vector<Expression**>> calls;
-  // The calls which are dropped, i.e., their return values ignored.
-  // This helps us avoid propagating a return value if it is not
-  // used.
-  std::unordered_set<Call*> droppedCalls;
   // All the constants that we return, including one with.
   std::unordered_set<Literal> returnedConsts;
   // Whether we return anything other than a const.
@@ -129,12 +125,6 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
   static void doVisitCall(DAEScanner* self, Expression** currp) {
     auto* call = (*currp)->cast<Call>();
     self->info->calls[call->target].push_back(currp);
-  }
-
-  void visitCall(Drop* curr) {
-    if (auto* call = Properties::getFallthrough(curr->value)->dynCast<Call>()) {
-      info->droppedCalls.insert(call);
-    }
   }
 
   void visitReturn(Return* curr) {
@@ -263,7 +253,6 @@ struct DAE : public Pass {
     }
     // Combine all the info.
     std::unordered_map<Name, std::vector<Expression**>> allCalls;
-    std::unordered_set<Call*> allDroppedCalls;
     std::unordered_map<Call*, Name> callFunctions; // call -> the function it is in
     for (auto& pair : infoMap) {
       auto parentName = pair.first;
@@ -278,7 +267,6 @@ struct DAE : public Pass {
           callFunctions[call] = parentName;
         }
       }
-      allDroppedCalls.insert(info.droppedCalls.begin(), info.droppedCalls.end());
     }
     // We now have a mapping of all call sites for each function. Check which
     // are always passed the same constant for a particular argument.
@@ -372,16 +360,13 @@ struct DAE : public Pass {
       auto value = infoMap[name].getReturnedConst();
       for (auto* callp : calls) {
         auto* call = (*callp)->cast<Call>();
-        if (allDroppedCalls.count(call) == 0) {
-          // The target returns a const, and this call site is not dropped,
-          // so we can propagate the constant!
-          Builder builder(*module);
-          *callp = builder.makeSequence(
-            builder.makeDrop(call),
-            builder.makeConst(value)
-          );
-          changed.insert(module->getFunction(callFunctions[call]));
-        }
+        // Propagate the constant!
+        Builder builder(*module);
+        *callp = builder.makeSequence(
+          builder.makeDrop(call),
+          builder.makeConst(value)
+        );
+        changed.insert(module->getFunction(callFunctions[call]));
       }
     }
     // If optimizing, optimize what we changed.
