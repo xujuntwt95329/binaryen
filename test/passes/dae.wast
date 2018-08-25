@@ -90,5 +90,12 @@
     (drop (call $c))
     (drop (i32.eqz (call $c)))
   )
+  (func $c1 (result i32)
+    (return (i32.const 5))
+  )
+  (func $d1
+    (drop (call $c1))
+  )
+;; recursion
 )
 

@@ -195,4 +195,19 @@
    )
   )
  )
+ (func $c1 (; 29 ;) (type $3) (result i32)
+  (return
+   (i32.const 5)
+  )
+ )
+ (func $d1 (; 30 ;) (type $1)
+  (drop
+   (block (result i32)
+    (drop
+     (call $c1)
+    )
+    (i32.const 5)
+   )
+  )
+ )
 )
