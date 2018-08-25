@@ -65,6 +65,14 @@ struct DAEFunctionInfo {
   // could be worked around by exporting a thunk that
   // adds the parameter.
   bool hasUnseenCalls = false;
+
+  bool returnsConstant() {
+    return returnedConsts.size() == 1 && !returnsNonConst;
+  }
+
+  Literal getReturnedConstant() {
+    return *returnedConsts.begin();
+  }
 };
 
 typedef std::unordered_map<Name, DAEFunctionInfo> DAEFunctionInfoMap;
@@ -146,15 +154,17 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
     numParams = func->getNumParams();
     info = &((*infoMap)[func->name]);
     CFGWalker<DAEScanner, Visitor<DAEScanner>, DAEBlockInfo>::doWalkFunction(func);
-    // Note a value falling through, if there is one.
-    if (func->result != none) {
-      noteReturnedValue(func->body);
-    }
     // If there are relevant params, check if they are used. (If
     // we can't optimize the function anyhow, there's no point.)
     if (numParams > 0 && !info->hasUnseenCalls) {
       findUnusedParams(func);
     }
+    // Check if this function returns a constant. First, note a value
+    // falling through, if there is one.
+    if (func->result != none) {
+      noteReturnedValue(func->body);
+    }
+    // See if all the returned values are identical.
   }
 
   void findUnusedParams(Function* func) {
@@ -339,6 +349,8 @@ struct DAE : public Pass {
         i--;
       }
     }
+    // Finally, propagate returned values: 
+
     if (optimize && changed.size() > 0) {
       OptUtils::optimizeAfterInlining(changed, module, runner);
     }
