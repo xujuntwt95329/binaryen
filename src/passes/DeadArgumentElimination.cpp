@@ -264,13 +264,19 @@ struct DAE : public Pass {
     // Combine all the info.
     std::unordered_map<Name, std::vector<Expression**>> allCalls;
     std::unordered_set<Call*> allDroppedCalls;
+    std::unordered_map<Call*, Name> callFunctions; // call -> the function it is in
     for (auto& pair : infoMap) {
+      auto parentName = pair.first;
       auto& info = pair.second;
       for (auto& pair : info.calls) {
-        auto name = pair.first;
+        auto targetName = pair.first;
         auto& calls = pair.second;
-        auto& allCallsToName = allCalls[name];
+        auto& allCallsToName = allCalls[targetName];
         allCallsToName.insert(allCallsToName.end(), calls.begin(), calls.end());
+        for (auto* callp : calls) {
+          auto* call = (*callp)->cast<Call>();
+          callFunctions[call] = parentName;
+        }
       }
       allDroppedCalls.insert(info.droppedCalls.begin(), info.droppedCalls.end());
     }
@@ -374,7 +380,7 @@ struct DAE : public Pass {
             builder.makeDrop(call),
             builder.makeConst(value)
           );
-          // TODO: add modified function to changed
+          changed.insert(module->getFunction(callFunctions[call]));
         }
       }
     }
