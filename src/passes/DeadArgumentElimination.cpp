@@ -33,8 +33,8 @@
 // watch for here).
 //
 
-#include <unordered_map>
-#include <unordered_set>
+#include <map>
+#include <set>
 
 #include <wasm.h>
 #include <pass.h>
@@ -52,7 +52,7 @@ struct DAEFunctionInfo {
   // The unused parameters, if any.
   SortedVector unusedParams;
   // Maps a function name to the calls going to it.
-  std::unordered_map<Name, std::vector<Expression**>> calls;
+  std::unordered_map<Name, std::vector<Call*>> calls;
   // All the constants that we return, including one with.
   std::unordered_set<Literal> returnedConsts;
   // Whether we return anything other than a const.
@@ -122,9 +122,8 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
     }
   }
 
-  static void doVisitCall(DAEScanner* self, Expression** currp) {
-    auto* call = (*currp)->cast<Call>();
-    self->info->calls[call->target].push_back(currp);
+  void visitCall(Call* curr) {
+    info->calls[curr->target].push_back(curr);
   }
 
   void visitReturn(Return* curr) {
@@ -269,8 +268,7 @@ struct DAE : public Pass {
         auto& calls = pair.second;
         auto& allCallsToName = allCalls[targetName];
         allCallsToName.insert(allCallsToName.end(), calls.begin(), calls.end());
-        for (auto* callp : calls) {
-          auto* call = (*callp)->cast<Call>();
+        for (auto* call : calls) {
           callFunctions[call] = parentName;
         }
       }
@@ -287,8 +285,7 @@ struct DAE : public Pass {
       auto numParams = func->getNumParams();
       for (Index i = 0; i < numParams; i++) {
         Literal value;
-        for (auto* callp : calls) {
-          auto* call = (*callp)->cast<Call>();
+        for (auto* call : calls) {
           assert(call->target == name);
           assert(call->operands.size() == numParams);
           auto* operand = call->operands[i];
@@ -338,8 +335,7 @@ struct DAE : public Pass {
           // effects, as that would prevent us removing them (flattening should
           // have been done earlier).
           bool canRemove = true;
-          for (auto* callp : calls) {
-            auto* call = (*callp)->cast<Call>();
+          for (auto* call : calls) {
             auto* operand = call->operands[i];
             if (EffectAnalyzer(runner->options, operand).hasSideEffects()) {
               canRemove = false;
@@ -360,32 +356,62 @@ struct DAE : public Pass {
     // Finally, propagate returned values: if a function is known to return
     // a constant, replace calls to it with (call, constant), relying on
     // the general optimization passes to benefit from that constant.
+    // First, find all the functions in whose bodies we can propagate into,
+    // and call sites in them.
+    std::unordered_map<Call*, Literal> callsWeCanPropagateTo;
+    std::unordered_set<Name> functionsWeCanPropagateTo;
     for (auto& pair : allCalls) {
       auto name = pair.first;
       if (!infoMap[name].returnsConst()) continue;
       auto& calls = pair.second;
       auto value = infoMap[name].getReturnedConst();
-      for (auto* callp : calls) {
-        auto* call = (*callp)->cast<Call>();
-        // Propagate the constant!
-        Builder builder(*module);
-        *callp = builder.makeSequence(
-          builder.makeDrop(call),
-          builder.makeConst(value)
-        );
-// XXX instead of callp etc. stuff, run a pass for this - we run
-//     passes to optimize later anyhow in those places, so not too bad, and simpler.
-        changed.insert(module->getFunction(callFunctions[call]));
+      for (auto* call : calls) {
+        callsWeCanPropagateTo[call] = value;
+        functionsWeCanPropagateTo.insert(callFunctions[call]);
       }
     }
-    // If optimizing, optimize what we changed.
+    // Perform the propagation TODO: parallelize?
+    struct PropagateCallResults : public ExpressionStackWalker<PropagateCallResults> {
+      Module* module;
+      std::unordered_set<Call*>* callsWeCanPropagateTo;
+
+      bool changed = false;
+    
+      void visitCall(Call* curr) {
+        auto iter = callsWeCanPropagateTo->find(curr);
+        // Check if this is a call with a result we can propagate.
+        if (iter != callsWeCanPropagateTo->end()) {
+          // Check if the value is not already dropped.
+          if (!ExpressionAnalyzer::isResultDropped(expressionStack)) {
+            // Propagate the value!
+            Builder builder(*module);
+            replaceCurrent(builder.makeSequence(
+              builder.makeDrop(curr),
+              builder.makeConst(iter->second)
+            ));
+            changed = true;
+          }
+        }
+      }
+    };
+    for (auto name : functionsWeCanPropagateTo) {
+      auto* func = module->getFunction(name);
+      PropagateCallResults propagator;
+      propagator.module = module;
+      propagator.callsWeCanPropagateTo = &callsWeCanPropagateTo;
+      propagator.walk(func->body);
+      if (propagator.changed) {
+        changed.insert(func);
+      }
+    }
+    // Finally, if optimizing, optimize what we changed.
     if (optimize && changed.size() > 0) {
       OptUtils::optimizeAfterInlining(changed, module, runner);
     }
   }
 
 private:
-  void removeParameter(Function* func, Index i, std::vector<Expression**> calls) {
+  void removeParameter(Function* func, Index i, std::vector<Call*> calls) {
     // Clear the type, which is no longer accurate.
     func->type = Name();
     // It's cumbersome to adjust local names - TODO don't clear them?
@@ -418,8 +444,7 @@ private:
       }
     } localUpdater(func, i, newIndex);
     // Remove the arguments from the calls.
-    for (auto* callp : calls) {
-      auto* call = (*callp)->cast<Call>();
+    for (auto* call : calls) {
       call->operands.erase(call->operands.begin() + i);
     }
   }
