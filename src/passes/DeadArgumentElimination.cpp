@@ -405,6 +405,7 @@ struct DAE : public Pass {
         changed.insert(func);
       }
     }
+    // TODO: cycles of the above?
     // Finally, if optimizing, optimize what we changed.
     if (optimize && changed.size() > 0) {
       OptUtils::optimizeAfterInlining(changed, module, runner);

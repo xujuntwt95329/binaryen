@@ -2,7 +2,7 @@ total
  [funcs]        : 8       
  [memory-data]  : 28      
  [table-data]   : 429     
- [total]        : 132     
+ [total]        : 134     
  [vars]         : 4       
  binary         : 12      
  block          : 8       
@@ -10,8 +10,8 @@ total
  call           : 2       
  call_import    : 1       
  call_indirect  : 4       
- const          : 47      
- drop           : 3       
+ const          : 48      
+ drop           : 4       
  get_global     : 1       
  get_local      : 18      
  if             : 3       
@@ -145,10 +145,13 @@ total
   (set_global $global$0
    (i32.const 32)
   )
-  (call $___stdio_write
-   (get_local $1)
-   (get_local $2)
+  (drop
+   (call $___stdio_write
+    (get_local $1)
+    (get_local $2)
+   )
   )
+  (i32.const 1)
  )
  (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 6 ;) (; has Stack IR ;)
   (local $0 i32)
@@ -243,7 +246,7 @@ total
  [funcs]        : 8       
  [memory-data]  : 28      
  [table-data]   : 429     
- [total]        : 132     
+ [total]        : 134     
  [vars]         : 4       
  binary         : 12      
  block          : 8       
@@ -251,8 +254,8 @@ total
  call           : 2       
  call_import    : 1       
  call_indirect  : 4       
- const          : 47      
- drop           : 3       
+ const          : 48      
+ drop           : 4       
  get_global     : 1       
  get_local      : 18      
  if             : 3       
@@ -387,10 +390,13 @@ total
   (set_global $global$0
    (i32.const 32)
   )
-  (call $___stdio_write
-   (get_local $1)
-   (get_local $2)
+  (drop
+   (call $___stdio_write
+    (get_local $1)
+    (get_local $2)
+   )
   )
+  (i32.const 1)
  )
  (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 6 ;) (; has Stack IR ;) (type $FUNCSIG$v)
   (local $0 i32)
@@ -485,7 +491,7 @@ total
  [funcs]        : 8       
  [memory-data]  : 28      
  [table-data]   : 429     
- [total]        : 132     
+ [total]        : 134     
  [vars]         : 4       
  binary         : 12      
  block          : 8       
@@ -493,8 +499,8 @@ total
  call           : 2       
  call_import    : 1       
  call_indirect  : 4       
- const          : 47      
- drop           : 3       
+ const          : 48      
+ drop           : 4       
  get_global     : 1       
  get_local      : 18      
  if             : 3       
@@ -629,10 +635,13 @@ total
   (set_global $global$0
    (i32.const 32)
   )
-  (call $___stdio_write
-   (get_local $1)
-   (get_local $2)
+  (drop
+   (call $___stdio_write
+    (get_local $1)
+    (get_local $2)
+   )
   )
+  (i32.const 1)
  )
  (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 6 ;) (; has Stack IR ;) (type $FUNCSIG$v)
   (local $0 i32)

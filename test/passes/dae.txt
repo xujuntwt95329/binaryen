@@ -3,6 +3,7 @@
  (type $1 (func))
  (type $2 (func (param i32 f64)))
  (type $3 (func (result i32)))
+ (type $4 (func (param i32) (result i32)))
  (table 1 1 anyfunc)
  (elem (i32.const 0) $a9)
  (export "a8" (func $a8))
@@ -177,12 +178,7 @@
  )
  (func $d (; 28 ;) (type $1)
   (drop
-   (block (result i32)
-    (drop
-     (call $c)
-    )
-    (i32.const 1234)
-   )
+   (call $c)
   )
   (drop
    (i32.eqz
@@ -202,12 +198,7 @@
  )
  (func $d1 (; 30 ;) (type $1)
   (drop
-   (block (result i32)
-    (drop
-     (call $c1)
-    )
-    (i32.const 5)
-   )
+   (call $c1)
   )
  )
  (func $c2 (; 31 ;) (type $3) (result i32)
@@ -223,12 +214,7 @@
  )
  (func $d2 (; 32 ;) (type $1)
   (drop
-   (block (result i32)
-    (drop
-     (call $c2)
-    )
-    (i32.const 6)
-   )
+   (call $c2)
   )
  )
  (func $c3 (; 33 ;) (type $3) (result i32)
@@ -259,25 +245,100 @@
  )
  (func $d4 (; 36 ;) (type $1)
   (drop
-   (block (result i32)
-    (drop
-     (call $c4)
-    )
-    (i32.const 8)
-   )
+   (call $c4)
   )
  )
  (func $c5 (; 37 ;) (type $3) (result i32)
   (drop
-   (block (result i32)
-    (drop
-     (call $c5)
-    )
-    (i32.const 9)
-   )
+   (call $c5)
   )
   (return
    (i32.const 9)
   )
+ )
+ (func $c6 (; 38 ;) (type $4) (param $x i32) (result i32)
+  (drop
+   (call $c6
+    (block (result i32)
+     (drop
+      (call $c6
+       (block (result i32)
+        (drop
+         (call $c6
+          (i32.const 1)
+         )
+        )
+        (i32.const 2)
+       )
+      )
+     )
+     (i32.const 2)
+    )
+   )
+  )
+  (i32.const 2)
+ )
+ (func $c7 (; 39 ;) (type $4) (param $x i32) (result i32)
+  (drop
+   (call $c7
+    (block (result i32)
+     (drop
+      (call $c7
+       (block (result i32)
+        (drop
+         (call $c7
+          (i32.const 1)
+         )
+        )
+        (i32.const 3)
+       )
+      )
+     )
+     (i32.const 3)
+    )
+   )
+  )
+  (i32.const 3)
+ )
+ (func $c8 (; 40 ;) (type $4) (param $x i32) (result i32)
+  (drop
+   (call $c6
+    (block (result i32)
+     (drop
+      (call $c7
+       (block (result i32)
+        (drop
+         (call $c8
+          (i32.const 1)
+         )
+        )
+        (i32.const 4)
+       )
+      )
+     )
+     (i32.const 3)
+    )
+   )
+  )
+  (drop
+   (call $c8
+    (block (result i32)
+     (drop
+      (call $c7
+       (block (result i32)
+        (drop
+         (call $c6
+          (i32.const 1)
+         )
+        )
+        (i32.const 2)
+       )
+      )
+     )
+     (i32.const 3)
+    )
+   )
+  )
+  (i32.const 4)
  )
 )
