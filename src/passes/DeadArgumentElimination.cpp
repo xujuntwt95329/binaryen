@@ -42,6 +42,7 @@
 #include <cfg/cfg-traversal.h>
 #include <ir/effects.h>
 #include <ir/properties.h>
+#include <ir/utils.h>
 #include <passes/opt-utils.h>
 #include <support/sorted_vector.h>
 
@@ -258,7 +259,7 @@ struct DAE : public Pass {
       runner.run();
     }
     // Combine all the info.
-    std::unordered_map<Name, std::vector<Expression**>> allCalls;
+    std::unordered_map<Name, std::vector<Call*>> allCalls;
     std::unordered_map<Call*, Name> callFunctions; // call -> the function it is in
     for (auto& pair : infoMap) {
       auto parentName = pair.first;
@@ -373,7 +374,7 @@ struct DAE : public Pass {
     // Perform the propagation TODO: parallelize?
     struct PropagateCallResults : public ExpressionStackWalker<PropagateCallResults> {
       Module* module;
-      std::unordered_set<Call*>* callsWeCanPropagateTo;
+      std::unordered_map<Call*, Literal>* callsWeCanPropagateTo;
 
       bool changed = false;
     
