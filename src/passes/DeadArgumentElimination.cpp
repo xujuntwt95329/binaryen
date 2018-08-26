@@ -359,6 +359,9 @@ struct DAE : public Pass {
     // the general optimization passes to benefit from that constant.
     // First, find all the functions in whose bodies we can propagate into,
     // and call sites in them.
+    // TODO: do this when not shrinking? as it can grow size, if the constant
+    //       ends up not helping further opts (call turned into block, drop,
+    //       call, const)
     std::unordered_map<Call*, Literal> callsWeCanPropagateTo;
     std::unordered_set<Name> functionsWeCanPropagateTo;
     for (auto& pair : allCalls) {
