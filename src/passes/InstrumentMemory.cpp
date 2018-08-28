@@ -18,42 +18,72 @@
 // Instruments the build with code to intercept all memory reads and writes.
 // This can be useful in building tools that analyze memory access behaviour.
 //
-// The instrumentation is performed by calling an FFI with an ID for each
-// memory access site. Load / store IDs share the same index space. The
-// instrumentation wraps the evaluation of the address operand, therefore
-// it executes before the load / store is executed. Note that Instrumentation
-// code must return tha address argument.
+// The instrumentation is performed by calling FFI both for the pointers,
+// and for the values. Each call also has an ID, to allow easy finding in
+// the wasm. The instrumentation functions must return the proper values,
+// as for simplicity and compactness we expect values to fall through them,
+// specifically the pointer calls must return the address, and the value
+// calls must return the value. An example should make this clear:
 //
-// Loads: load(id, bytes, offset, address) => address
+// Loads: load-ptr(id, bytes, offset, address) => address
+//        load-i32(id, value) => value
+//        load-f32, f64, etc.
 //
 //  Before:
 //   (i32.load8_s align=1 offset=2 (i32.const 3))
 //
 //  After:
-//   (i32.load8_s align=1 offset=2
-//    (call $load
-//     (i32.const n) // ID
-//     (i32.const 1) // bytes
-//     (i32.const 2) // offset
-//     (i32.const 3) // address
+//   (call $load-i32
+//    (i32.const n) // ID
+//    (i32.load8_s align=1 offset=2
+//     (call $load-ptr
+//      (i32.const n) // ID
+//      (i32.const 1) // bytes
+//      (i32.const 2) // offset
+//      (i32.const 3) // address
+//     )
 //    )
 //   )
 //
 // Stores: store(id, bytes, offset, address) => address
+//         store-i32(id, value) => value
+//         store-f32, f64, etc.
 //
 //  Before:
 //   (i32.store8 align=1 offset=2 (i32.const 3) (i32.const 4))
 //
 //  After:
 //   (i32.store16 align=1 offset=2
-//    (call $store
+//    (call $store-ptr
 //     (i32.const n) // ID
 //     (i32.const 1) // bytes
 //     (i32.const 2) // offset
 //     (i32.const 3) // address
 //    )
-//    (i32.const 4)
+//    (call $store-i32
+//     (i32.const n) // ID
+//     (i32.const 4)
+//    )
 //   )
+//
+// The JS loading code must provide the imports, for example,
+// to alert on operation you might use this:
+//
+//  var importsForTheWasm = {
+//    // other stuff here, like 'env' if you need it, etc.
+//    'instrument': {
+//      'load-ptr': function(id, bytes, offset, address) {
+//        alert(['load', id, bytes, offset, address]);
+//        return address;
+//      },
+//      'store-ptr': function(id, bytes, offset, address) {
+//        alert(['store', id, bytes, offset, address]);
+//        return address;
+//      },
+// XXX add
+//    }
+//  };
+//
 
 #include <wasm.h>
 #include <wasm-builder.h>
@@ -91,7 +121,9 @@ struct InstrumentMemory : public WalkerPass<PostWalker<InstrumentMemory>> {
   }
 
 private:
-  std::atomic<Index> id;
+  std::atomic<Index> id; // TODO: this is ready for parallelization, but would
+                         //       prevent deterministic output
+
   Expression* makeLoadCall(Load* curr) {
     Builder builder(*getModule());
     curr->ptr = builder.makeCallImport(load,
