@@ -126,10 +126,10 @@ public:
     setupTable();
     setupGlobals();
     // keep adding functions until we run out of input
-    while (!finishedInput) {
+    do {
       auto* func = addFunction();
       addInvocations(func);
-    }
+    } while (!finishedInput);
     if (HANG_LIMIT > 0) {
       addHangLimitSupport();
     }
@@ -176,7 +176,7 @@ private:
   static const bool DE_NAN = true;
 
   // Whether to emit atomics
-  bool emitAtomics = true;
+  bool emitAtomics = false;
 
   // Whether to emit atomic waits (which in single-threaded mode, may hang...)
   static const bool ATOMIC_WAITS = false;
@@ -363,10 +363,15 @@ private:
   Function* addFunction() {
     Index num = wasm.functions.size();
     func = new Function;
-    func->name = std::string("func_") + std::to_string(num);
+    if (num == 0) {
+      func->name = "main";
+    } else {
+      func->name = std::string("func_") + std::to_string(num);
+    }
     func->result = getReachableType();
     assert(typeLocals.empty());
     Index numParams = upToSquared(MAX_PARAMS);
+    if (num == 0) numParams = 0;
     for (Index i = 0; i < numParams; i++) {
       auto type = getConcreteType();
       typeLocals[type].push_back(func->params.size());
@@ -410,6 +415,11 @@ private:
       export_->value = func->name;
       export_->kind = ExternalKind::Function;
       wasm.addExport(export_);
+    }
+    if (num == 0) {
+      func->body = makeNop(none);
+      func->result = none;
+      func->type = Name();
     }
     // add some to the table
     while (oneIn(3)) {
