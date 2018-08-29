@@ -544,6 +544,7 @@ private:
       case 9: return makeNop(none);
       case 10: return makeSetGlobal(none);
     }
+// special: make an increment, an x = x + const. very common in real world code, can find bugs
     WASM_UNREACHABLE();
   }
 
