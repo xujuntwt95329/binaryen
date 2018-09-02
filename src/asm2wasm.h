@@ -1111,53 +1111,70 @@ void Asm2WasmBuilder::processAsm(Ref ast) {
       }
     } else if (curr[0] == RETURN) {
       // exports
-      Ref object = curr[1];
-      Ref contents = object[1];
-      std::map<Name, Export*> exported;
-      for (unsigned k = 0; k < contents->size(); k++) {
-        Ref pair = contents[k];
-        IString key = pair[0]->getIString();
-        if (pair[1]->isString()) {
-          // exporting a function
-          IString value = pair[1]->getIString();
-          if (key == Name("_emscripten_replace_memory")) {
-            // asm.js memory growth provides this special non-asm function, which we don't need (we use grow_memory)
-            assert(!wasm.getFunctionOrNull(value));
-            continue;
-          } else if (key == UDIVMODDI4) {
-            udivmoddi4 = value;
-          } else if (key == GET_TEMP_RET0) {
-            getTempRet0 = value;
-          }
-          if (exported.count(key) > 0) {
-            // asm.js allows duplicate exports, but not wasm. use the last, like asm.js
-            exported[key]->value = value;
+      if (curr[1]->isString()) {
+        // A singleton export, just
+        //    return name;
+        // (instead of return { .. }).
+        // We must invent a name here for wasm (wasm exports are in an
+        // object. We could use the function name in theory, but it may
+        // be unnamed (just a number) which would be weird. Instead,
+        // use a standard name.
+        auto* export_ = new Export;
+        export_->name = "singleton";
+        export_->value = curr[1]->getIString();
+        export_->kind = ExternalKind::Function;
+        wasm.addExport(export_);
+      } else {
+        // A "normal" export,
+        //    return { .. }
+        Ref object = curr[1];
+        Ref contents = object[1];
+        std::map<Name, Export*> exported;
+        for (unsigned k = 0; k < contents->size(); k++) {
+          Ref pair = contents[k];
+          IString key = pair[0]->getIString();
+          if (pair[1]->isString()) {
+            // exporting a function
+            IString value = pair[1]->getIString();
+            if (key == Name("_emscripten_replace_memory")) {
+              // asm.js memory growth provides this special non-asm function, which we don't need (we use grow_memory)
+              assert(!wasm.getFunctionOrNull(value));
+              continue;
+            } else if (key == UDIVMODDI4) {
+              udivmoddi4 = value;
+            } else if (key == GET_TEMP_RET0) {
+              getTempRet0 = value;
+            }
+            if (exported.count(key) > 0) {
+              // asm.js allows duplicate exports, but not wasm. use the last, like asm.js
+              exported[key]->value = value;
+            } else {
+              auto* export_ = new Export;
+              export_->name = key;
+              export_->value = value;
+              export_->kind = ExternalKind::Function;
+              wasm.addExport(export_);
+              exported[key] = export_;
+            }
           } else {
+            // export a number. create a global and export it
+            assert(pair[1]->isNumber());
+            assert(exported.count(key) == 0);
+            auto value = pair[1]->getInteger();
+            auto* global = builder.makeGlobal(
+              key,
+              i32,
+              builder.makeConst(Literal(int32_t(value))),
+              Builder::Immutable
+            );
+            wasm.addGlobal(global);
             auto* export_ = new Export;
             export_->name = key;
-            export_->value = value;
-            export_->kind = ExternalKind::Function;
+            export_->value = global->name;
+            export_->kind = ExternalKind::Global;
             wasm.addExport(export_);
             exported[key] = export_;
           }
-        } else {
-          // export a number. create a global and export it
-          assert(pair[1]->isNumber());
-          assert(exported.count(key) == 0);
-          auto value = pair[1]->getInteger();
-          auto* global = builder.makeGlobal(
-            key,
-            i32,
-            builder.makeConst(Literal(int32_t(value))),
-            Builder::Immutable
-          );
-          wasm.addGlobal(global);
-          auto* export_ = new Export;
-          export_->name = key;
-          export_->value = global->name;
-          export_->kind = ExternalKind::Global;
-          wasm.addExport(export_);
-          exported[key] = export_;
         }
       }
     }
