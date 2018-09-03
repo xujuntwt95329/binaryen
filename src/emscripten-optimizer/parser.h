@@ -558,6 +558,19 @@ class Parser {
             assert(value2.isNumber());
             arg = Builder::makePrefix(MINUS, parseFrag(value2));
             src += value2.size;
+          } else if (value.type == SEPARATOR) {
+            // It is valid to write
+            //   case (5):
+            assert(value.str == OPEN_PAREN);
+            src += value.size;
+            skipSpace(src);
+            Frag value2(src);
+            assert(value2.isNumber());
+            arg = parseFrag(value2);
+            src += value2.size;
+            skipSpace(src);
+            assert(*src == ')');
+            src++;
           } else {
             // identifier and function call
             assert(value.type == IDENT);
