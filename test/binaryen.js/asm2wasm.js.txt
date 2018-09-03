@@ -1,0 +1,16 @@
+(module
+ (import "env" "memory" (memory $0 0))
+ (import "env" "table" (table 0 0 anyfunc))
+ (import "env" "memoryBase" (global $memoryBase i32))
+ (import "env" "tableBase" (global $tableBase i32))
+ (export "add1" (func $func))
+ (func $func (; 0 ;) (param $x i32) (result i32)
+  (return
+   (i32.add
+    (get_local $x)
+    (i32.const 1)
+   )
+  )
+ )
+)
+
