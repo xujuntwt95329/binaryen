@@ -20,6 +20,7 @@
 
 #include <mutex>
 
+#include "asm2wasm.h"
 #include "binaryen-c.h"
 #include "pass.h"
 #include "wasm.h"
@@ -2014,6 +2015,35 @@ void BinaryenModulePrintAsmjs(BinaryenModuleRef module) {
   jser.printAst();
 
   std::cout << jser.buffer;
+}
+
+// Compile asm.js to a module
+BinaryenModuleRef BinaryenModuleFromAsmjs(const char* text) {
+  if (tracing) {
+    std::cout << "  // BinaryenModuleFromAsmjs\n";
+  }
+
+  auto* wasm = new Module;
+  try {
+    Asm2WasmPreProcessor pre;
+    cashew::Parser<Ref, DotZeroValueBuilder> builder;
+    auto* copy = strdup(text);
+    auto asmjs = builder.parseToplevel(copy);
+    // compile the code
+    Asm2WasmBuilder asm2wasm(*wasm,
+                             pre,
+                             /* debug = */ false,
+                             TrapMode::JS, // FIXME! slow
+                             globalPassOptions,
+                             /* legalizeJavaScriptFFI = */ true,
+                             /* runningDefaultOptimizationPasses = */ false,
+                             /* wasmOnly = */ true);
+    asm2wasm.processAsm(asmjs);
+  } catch (ParseException& p) {
+    p.dump(std::cerr);
+    Fatal() << "error in parsing asm.js text";
+  }
+  return wasm;
 }
 
 int BinaryenModuleValidate(BinaryenModuleRef module) {

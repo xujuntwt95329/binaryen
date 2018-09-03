@@ -1577,6 +1577,15 @@ Module['parseText'] = function(text) {
   return new Module['Module'](ptr);
 };
 
+// Compiles asm.js to a module
+Module['asm2wasm'] = function(text) {
+  var buffer = _malloc(text.length + 1);
+  writeAsciiToMemory(text, buffer);
+  var ptr = Module['_BinaryenModuleFromAsmjs'](buffer);
+  _free(buffer);
+  return new Module['Module'](ptr);
+};
+
 // Gets the currently set optimize level. 0, 1, 2 correspond to -O0, -O1, -O2, etc.
 Module['getOptimizeLevel'] = function() {
   return Module['_BinaryenGetOptimizeLevel']();

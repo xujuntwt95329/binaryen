@@ -659,6 +659,9 @@ void BinaryenModulePrint(BinaryenModuleRef module);
 // Print a module to stdout in asm.js syntax.
 void BinaryenModulePrintAsmjs(BinaryenModuleRef module);
 
+// Compile asm.js to a module
+BinaryenModuleRef BinaryenModuleFromAsmjs(const char* text);
+
 // Validate a module, showing errors on problems.
 //  @return 0 if an error occurred, 1 if validated succesfully
 int BinaryenModuleValidate(BinaryenModuleRef module);
