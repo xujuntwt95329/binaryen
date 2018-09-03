@@ -2033,7 +2033,7 @@ BinaryenModuleRef BinaryenModuleFromAsmjs(const char* text) {
     Asm2WasmBuilder asm2wasm(*wasm,
                              pre,
                              /* debug = */ false,
-                             TrapMode::JS, // FIXME! slow
+                             TrapMode::Allow, // FIXME add options
                              globalPassOptions,
                              /* legalizeJavaScriptFFI = */ true,
                              /* runningDefaultOptimizationPasses = */ false,
