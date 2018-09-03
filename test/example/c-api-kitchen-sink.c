@@ -578,6 +578,21 @@ void test_tracing() {
   BinaryenSetAPITracing(0);
 }
 
+void test_asm2wasm() {
+  const char* asmjs =
+    "function M(stdlib, foreign, heap) {\n"
+    "  'use asm';\n"
+    "  function func() {\n"
+    "     return 0;\n"
+    "   }\n"
+    "   return { exp: func };\n"
+    " }";
+
+  BinaryenModuleRef module = BinaryenModuleFromAsmjs(asmjs);
+  BinaryenModulePrint(module);
+  BinaryenModuleDispose(module);
+}
+
 int main() {
   test_types();
   test_core();
@@ -587,6 +602,7 @@ int main() {
   test_interpret();
   test_nonvalid();
   test_tracing();
+  test_asm2wasm();
 
   return 0;
 }
