@@ -263,7 +263,7 @@ private:
       export_->kind = ExternalKind::Function;
       module->addExport(export_);
     };
-    if (!module->getExportOrNull(GET_TEMP_RET_0)) {
+    if (!module->getFunctionOrNull(GET_TEMP_RET_0)) {
       Builder builder(*module);
       auto* func = new Function();
       func->name = GET_TEMP_RET_0;
@@ -272,7 +272,7 @@ private:
       module->addFunction(func);
       exportIt(func);
     }
-    if (!module->getExportOrNull(SET_TEMP_RET_0)) {
+    if (!module->getFunctionOrNull(SET_TEMP_RET_0)) {
       Builder builder(*module);
       auto* func = new Function();
       func->name = SET_TEMP_RET_0;
