@@ -14,6 +14,7 @@ function asm(global, env, buffer) {
   var n = env.gb | 0;
   var STACKTOP = env.STACKTOP | 0;
   var setTempRet0=env.setTempRet0;
+  var setTempRet0FAKE=env.setTempRet0FAKE;
 
   var abort = env.abort;
   var print = env.print;
@@ -302,7 +303,8 @@ function asm(global, env, buffer) {
     if (return_int() | 0) {
       phi() | 0; // drop this
       setTempRet0(10); // this too
-      zeroInit(setTempRet0(10) | 0);
+      setTempRet0FAKE(10); // this too
+      zeroInit(setTempRet0FAKE(10) | 0);
     }
     return phi() | 0;
   }

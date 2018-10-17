@@ -701,14 +701,15 @@ private:
     else if (call->is<CallIndirect>()) call->cast<CallIndirect>()->type = type;
   }
 
-  FunctionType* getBuiltinFunctionType(Name module, Name base, ExpressionList* operands = nullptr) {
-    if (module == GLOBAL_MATH) {
-      if (base == ABS) {
-        assert(operands && operands->size() == 1);
-        Type type = (*operands)[0]->type;
-        if (type == i32) return ensureFunctionType("ii", &wasm);
-        if (type == f32) return ensureFunctionType("ff", &wasm);
-        if (type == f64) return ensureFunctionType("dd", &wasm);
+  // normally we detect function types by their usage, since that is how asm.js
+  // works. however, some special functions can be detected by convention even
+  // without any use.
+  FunctionType* getSpecialFunctionType(Name module, Name base) {
+    if (module == ENV) {
+      if (base == GET_TEMP_RET_0) {
+        return ensureFunctionType("i", &wasm);
+      } else if (base == SET_TEMP_RET_0) {
+        return ensureFunctionType("vi", &wasm);
       }
     }
     return nullptr;
@@ -1124,7 +1125,7 @@ void Asm2WasmBuilder::processAsm(Ref ast) {
             continue;
           } else if (key == UDIVMODDI4) {
             udivmoddi4 = value;
-          } else if (key == GET_TEMP_RET0) {
+          } else if (key == GET_TEMP_RET_0) {
             getTempRet0 = value;
           }
           if (exported.count(key) > 0) {
@@ -1202,14 +1203,12 @@ void Asm2WasmBuilder::processAsm(Ref ast) {
 
   ModuleUtils::iterImportedFunctions(wasm, [&](Function* import) {
     IString name = import->name;
-    if (importedFunctionTypes.find(name) != importedFunctionTypes.end()) {
-      // special math builtins
-      FunctionType* builtin = getBuiltinFunctionType(import->module, import->base);
-      if (builtin) {
-        import->type = builtin->name;
-      } else {
-        import->type = ensureFunctionType(getSig(importedFunctionTypes[name].get()), &wasm)->name;
-      }
+    // special functions like math builtins have known types
+    FunctionType* known = getSpecialFunctionType(import->module, import->base);
+    if (known) {
+      import->type = known->name;
+    } else if (importedFunctionTypes.find(name) != importedFunctionTypes.end()) {
+      import->type = ensureFunctionType(getSig(importedFunctionTypes[name].get()), &wasm)->name;
     } else if (import->module != ASM2WASM) { // special-case the special module
       // never actually used, which means we don't know the function type since the usage tells us, so illegal for it to remain
       toErase.push_back(name);

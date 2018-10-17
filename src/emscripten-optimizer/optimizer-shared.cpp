@@ -60,7 +60,7 @@ AsmType detectType(Ref node, AsmData *asmData, bool inVarDef, IString minifiedFr
     }
     if (!inVarDef) {
       if (node == INF || node == NaN) return ASM_DOUBLE;
-      if (node == TEMP_RET0) return ASM_INT;
+      if (node == TEMP_RET_0) return ASM_INT;
       return ASM_NONE;
     }
     // We are in a variable definition, where Math_fround(0) optimized into a global constant becomes f0 = Math_fround(0)
