@@ -3,6 +3,7 @@
  (global $M (mut i32) (i32.const 0))
  (export "floats" (func $legalstub$floats))
  (export "getTempRet0" (func $ub))
+ (export "setTempRet0" (func $sett))
  (export "neg" (func $legalstub$neg))
  (export "bitcasts" (func $legalstub$bitcasts))
  (export "ctzzzz" (func $ctzzzz))
@@ -15,7 +16,10 @@
   )
   (get_global $M)
  )
- (func $legalstub$floats (; 2 ;) (; has Stack IR ;) (param $0 f64) (result f64)
+ (func $sett (; 2 ;) (; has Stack IR ;) (param $0 i32)
+  (nop)
+ )
+ (func $legalstub$floats (; 3 ;) (; has Stack IR ;) (param $0 f64) (result f64)
   (f64.promote/f32
    (f32.add
     (f32.const 0)
@@ -25,7 +29,7 @@
    )
   )
  )
- (func $legalstub$neg (; 3 ;) (; has Stack IR ;) (param $0 i32) (param $1 i32) (result f64)
+ (func $legalstub$neg (; 4 ;) (; has Stack IR ;) (param $0 i32) (param $1 i32) (result f64)
   (i32.store
    (get_local $0)
    (get_local $1)
@@ -38,7 +42,7 @@
    )
   )
  )
- (func $legalstub$bitcasts (; 4 ;) (; has Stack IR ;) (param $0 i32) (param $1 f64)
+ (func $legalstub$bitcasts (; 5 ;) (; has Stack IR ;) (param $0 i32) (param $1 f64)
   (nop)
  )
 )

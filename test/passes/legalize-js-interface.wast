@@ -9,4 +9,26 @@
   )
 )
 (module)
+(module
+  (import "env" "getTempRet0" (func $importedGet (result i32)))
+  (import "env" "setTempRet0" (func $importedSet (param i32)))
+  (func $func
+    (drop (call $importedGet))
+  )
+  (func "use" (result i64)
+    (return (i64.const -1))
+  )
+)
+(module
+  (export "getTempRet0" (func $implementedGet))
+  (export "setTempRet0" (func $implementedSet))
+  (func $implementedGet (result i32)
+    (unreachable)
+  )
+  (func $implementedSet (param i32)
+  )
+  (func "use" (result i64)
+    (return (i64.const -1))
+  )
+)
 

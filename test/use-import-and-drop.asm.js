@@ -1,5 +1,6 @@
 Module["asm"] = (function(global, env, buffer) {
  "use asm";
+ var getTempRet0=env.getTempRet0;
  var setTempRet0=env.setTempRet0;
  var Math_imul = global.Math.imul;
  function test1() {

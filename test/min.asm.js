@@ -46,7 +46,10 @@ function (global, env, buffer) {
     ub(); // emterpreter assertions mode might add some code here
     return M | 0;
   }
+  function sett(x) {
+    x = x | 0;
+  }
 
-  return { floats: floats, getTempRet0: ub, neg: neg, bitcasts: bitcasts, ctzzzz: ctzzzz };
+  return { floats: floats, getTempRet0: ub, setTempRet0: sett, neg: neg, bitcasts: bitcasts, ctzzzz: ctzzzz };
 }
 

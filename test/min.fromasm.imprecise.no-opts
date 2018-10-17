@@ -8,6 +8,7 @@
  (global $M (mut i32) (i32.const 0))
  (export "floats" (func $legalstub$floats))
  (export "getTempRet0" (func $ub))
+ (export "setTempRet0" (func $sett))
  (export "neg" (func $legalstub$neg))
  (export "bitcasts" (func $legalstub$bitcasts))
  (export "ctzzzz" (func $ctzzzz))
@@ -73,7 +74,10 @@
    (get_global $M)
   )
  )
- (func $legalstub$floats (; 5 ;) (param $0 f64) (result f64)
+ (func $sett (; 5 ;) (param $x i32)
+  (nop)
+ )
+ (func $legalstub$floats (; 6 ;) (param $0 f64) (result f64)
   (f64.promote/f32
    (call $floats
     (f32.demote/f64
@@ -82,7 +86,7 @@
    )
   )
  )
- (func $legalstub$neg (; 6 ;) (param $0 i32) (param $1 i32) (result f64)
+ (func $legalstub$neg (; 7 ;) (param $0 i32) (param $1 i32) (result f64)
   (f64.promote/f32
    (call $neg
     (get_local $0)
@@ -90,7 +94,7 @@
    )
   )
  )
- (func $legalstub$bitcasts (; 7 ;) (param $0 i32) (param $1 f64)
+ (func $legalstub$bitcasts (; 8 ;) (param $0 i32) (param $1 f64)
   (call $bitcasts
    (get_local $0)
    (f32.demote/f64

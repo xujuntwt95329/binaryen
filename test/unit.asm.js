@@ -13,6 +13,7 @@ function asm(global, env, buffer) {
   var tempDoublePtr = env.tempDoublePtr | 0;
   var n = env.gb | 0;
   var STACKTOP = env.STACKTOP | 0;
+  var getTempRet0=env.getTempRet0;
   var setTempRet0=env.setTempRet0;
   var setTempRet0FAKE=env.setTempRet0FAKE;
 

@@ -25,11 +25,23 @@
 // This pass also legalizes according to asm.js FFI rules, which
 // disallow f32s. TODO: an option to not do that, if it matters?
 //
+// To implement i64 passing to and from JS, we use the "tempRet0"
+// functions, which allow setting a global 32 bit number. This pass
+// creates both getTempRet0 and setTempRet0 unconditionally (the
+// optimizer can remove it later, if unneeded). If we see those
+// functions imported, we use those instead, or if we see them
+// exported, likewise, but we cannot use just one of the pair -
+// we must see both get and set, or neither (otherwise, the get
+// might not work properly with the set).
+//
 
 #include "wasm.h"
 #include "pass.h"
 #include "wasm-builder.h"
+#include "shared-constants.h"
+#include "asmjs/shared-constants.h"
 #include "ir/function-type-utils.h"
+#include "ir/import-utils.h"
 #include "ir/literal-utils.h"
 #include "ir/utils.h"
 
@@ -41,6 +53,8 @@ Name SET_TEMP_RET_0("setTempRet0");
 
 struct LegalizeJSInterface : public Pass {
   void run(PassRunner* runner, Module* module) override {
+    ensureTempRet0Helpers(module);
+
     // for each illegal export, we must export a legalized stub instead
     for (auto& ex : module->exports) {
       if (ex->kind == ExternalKind::Function) {
@@ -103,17 +117,18 @@ struct LegalizeJSInterface : public Pass {
       passRunner.add<FixImports>(&illegalImportsToLegal);
       passRunner.run();
     }
-
-    if (needTempRet0Helpers) {
-      addTempRet0Helpers(module);
-    }
   }
 
 private:
   // map of illegal to legal names for imports
   std::map<Name, Name> illegalImportsToLegal;
 
-  bool needTempRet0Helpers = false;
+  // The names of the tempRet0 functions
+  Name getTempRet0, setTempRet0;
+
+  // Whether we have the tempRet0 global in this module. If so,
+  // we can read/write to it directly.
+  bool hasGlobal;
 
   template<typename T>
   bool isIllegal(T* t) {
@@ -153,11 +168,20 @@ private:
       auto index = builder.addVar(legal, Name(), i64);
       auto* block = builder.makeBlock();
       block->list.push_back(builder.makeSetLocal(index, call));
-      ensureTempRet0(module);
-      block->list.push_back(builder.makeSetGlobal(
-        TEMP_RET_0,
-        I64Utilities::getI64High(builder, index)
-      ));
+      Expression* set;
+      if (hasGlobal) {
+        set = builder.makeSetGlobal(
+          TEMP_RET_0,
+          { I64Utilities::getI64High(builder, index) }
+        );
+      } else {
+        set = builder.makeCall(
+          setTempRet0,
+          { I64Utilities::getI64High(builder, index) },
+          none
+        );
+      }
+      block->list.push_back(set);
       block->list.push_back(I64Utilities::getI64Low(builder, index));
       block->finalize();
       legal->body = block;
@@ -213,8 +237,11 @@ private:
     if (imFunctionType->result == i64) {
       call->type = i32;
       Expression* get;
-      ensureTempRet0(module);
-      get = builder.makeGetGlobal(TEMP_RET_0, i32);
+      if (hasGlobal) {
+        get = builder.makeGetGlobal(TEMP_RET_0, i32);
+      } else {
+        get = builder.makeCall(getTempRet0, {}, i32);
+      }
       func->body = I64Utilities::recreateI64(builder, call, get);
       type->result = i32;
     } else if (imFunctionType->result == f32) {
@@ -241,7 +268,40 @@ private:
     return func->name;
   }
 
-  void ensureTempRet0(Module* module) {
+  // The tempRet0 value and getter/setter are necessary to send/receive 64-bit
+  // values with JS.
+  void ensureTempRet0Helpers(Module* module) {
+    // If imports exist, use them
+    ImportInfo importInfo(*module);
+    auto* importedGet = importInfo.getImportedFunction(ENV, GET_TEMP_RET_0);
+    auto* importedSet = importInfo.getImportedFunction(ENV, SET_TEMP_RET_0);
+    if (importedGet && importedSet) {
+      getTempRet0 = importedGet->name;
+      setTempRet0 = importedSet->name;
+      hasGlobal = false;
+      return;
+    }
+    if (importedGet || importedSet) {
+      Fatal() << "LegalizeJSInterface cannot handle partial tempRet0 imports";
+    }
+    // They may exist, in which case they may be under another name - find by
+    // the export name.
+    auto* exportedGet = module->getExportOrNull(GET_TEMP_RET_0);
+    auto* exportedSet = module->getExportOrNull(SET_TEMP_RET_0);
+    if (exportedGet && exportedSet) {
+      getTempRet0 = exportedGet->value;
+      setTempRet0 = exportedSet->value;
+      hasGlobal = module->getGlobalOrNull(TEMP_RET_0) != nullptr;
+      return;
+    }
+    if (exportedGet || exportedSet) {
+      Fatal() << "LegalizeJSInterface cannot handle partial tempRet0 imports";
+    }
+    // No imports or exports - create them with default names.
+    getTempRet0 = GET_TEMP_RET_0;
+    setTempRet0 = SET_TEMP_RET_0;
+    hasGlobal = true;
+    Builder builder(*module);
     if (!module->getGlobalOrNull(TEMP_RET_0)) {
       module->addGlobal(Builder::makeGlobal(
         TEMP_RET_0,
@@ -249,42 +309,22 @@ private:
         LiteralUtils::makeZero(i32, *module),
         Builder::Mutable
       ));
-      needTempRet0Helpers = true;
     }
-  }
-
-  void addTempRet0Helpers(Module* module) {
-    // We should also let JS access the tempRet0 global, which
-    // is necessary to send/receive 64-bit return values.
-    auto exportIt = [&](Function* func) {
+    auto add = [&](Name name, Index hasParam, Type result, Expression* body) {
+      auto* func = new Function();
+      func->name = name;
+      if (hasParam) func->params.push_back(i32);
+      func->result = result;
+      func->body = body;
+      module->addFunction(func);
       auto* export_ = new Export;
       export_->name = func->name;
       export_->value = func->name;
       export_->kind = ExternalKind::Function;
       module->addExport(export_);
     };
-    if (!module->getFunctionOrNull(GET_TEMP_RET_0)) {
-      Builder builder(*module);
-      auto* func = new Function();
-      func->name = GET_TEMP_RET_0;
-      func->result = i32;
-      func->body = builder.makeGetGlobal(TEMP_RET_0, i32);
-      module->addFunction(func);
-      exportIt(func);
-    }
-    if (!module->getFunctionOrNull(SET_TEMP_RET_0)) {
-      Builder builder(*module);
-      auto* func = new Function();
-      func->name = SET_TEMP_RET_0;
-      func->result = none;
-      func->params.push_back(i32);
-      func->body = builder.makeSetGlobal(
-        TEMP_RET_0,
-        builder.makeGetLocal(0, i32)
-      );
-      module->addFunction(func);
-      exportIt(func);
-    }
+    add(getTempRet0, false, i32, builder.makeGetGlobal(TEMP_RET_0, i32));
+    add(setTempRet0, true, none, builder.makeSetGlobal(TEMP_RET_0, builder.makeGetLocal(0, i32)));
   }
 };
 
