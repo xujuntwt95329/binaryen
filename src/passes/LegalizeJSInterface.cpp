@@ -172,7 +172,7 @@ private:
       if (hasGlobal) {
         set = builder.makeSetGlobal(
           TEMP_RET_0,
-          { I64Utilities::getI64High(builder, index) }
+          I64Utilities::getI64High(builder, index)
         );
       } else {
         set = builder.makeCall(
