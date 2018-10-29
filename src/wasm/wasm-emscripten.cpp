@@ -152,12 +152,31 @@ Function* EmscriptenGlueGenerator::generateMemoryGrowthFunction() {
   return growFunction;
 }
 
-static bool hasI64ResultOrParam(FunctionType* ft) {
-  if (ft->result == i64) return true;
-  for (auto ty : ft->params) {
-    if (ty == i64) return true;
+// Legalizes a signature for JS calling, replacing i64s with i32s accordingly.
+static std::string legalizeSig(std::string sig) {
+  std::string ret;
+  if (sig[0] == 'j') {
+    // i64 returned; return an i32 instead, and high bits will be handled
+    // separately.
+    ret += 'i';
+  } else if (sig[0] == 'f') {
+    // f32 returned; return an f64 instead.
+    ret += 'd';
+  } else {
+    ret += sig[0];
   }
-  return false;
+  for (Index i = 1; i < sig.size(); i++) {
+    if (sig[i] == 'j') {
+      // i64 passed; pass two i32s instead
+      ret += "ii";
+    } else if (sig[i] == 'f') {
+      // f32 passed; pass an f64 instead.
+      ret += "d";
+    } else {
+      ret += sig[i];
+    }
+  }
+  return ret;
 }
 
 inline void exportFunction(Module& wasm, Name name, bool must_export) {
@@ -184,8 +203,11 @@ void EmscriptenGlueGenerator::generateDynCallThunks() {
       continue;
     }
     std::string sig = getSig(wasm.getFunction(indirectFunc));
+    // Operate on the legalized signature - these calls go through JS, and
+    // the legalization pass will fix that up later, and will need the
+    // legalized signatures for invoke/dynCall
+    sig = legalizeSig(sig);
     auto* funcType = ensureFunctionType(sig, &wasm);
-    if (hasI64ResultOrParam(funcType)) continue; // Can't export i64s on the web.
     if (!sigs.insert(sig).second) continue; // Sig is already in the set
     std::vector<NameType> params;
     params.emplace_back("fptr", i32); // function pointer param
