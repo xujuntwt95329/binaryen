@@ -760,14 +760,14 @@ struct Optimizer : public RelooperRecursor {
       // Rely on canonicalization: the block's code is a nameless wasm Block,
       // unless it's a singleton item. We look through that block if present,
       // and look for sets of a constant or of a get; anything else is
-      // dangerous and we must abort.
-      bool Dangerous = false;
+      // dangerous and we must forget about all constants (but constants
+      // can appear later).
       // Track all locals set to constants, to support simple copies etc.,
       // which may occur temporarily due to flattening. We keep a map
       // of index => constant value, if constant
       std::map<wasm::Index, wasm::Literal> ConstantIndexes;
       walkCanonicalizedItems(ParentBlock->Code, [&](wasm::Expression* Item) {
-        if (auto* Set = ParentBlock->Code->dynCast<wasm::SetLocal>()) {
+        if (auto* Set = Item->dynCast<wasm::SetLocal>()) {
           if (auto* Get = Set->value->dynCast<wasm::GetLocal>()) {
             // If already constant, copy that constant.
             auto iter = ConstantIndexes.find(Get->index);
@@ -783,10 +783,9 @@ struct Optimizer : public RelooperRecursor {
           }
         } else {
           // Not a set - dangerous.
-          Dangerous = true;
+          ConstantIndexes.clear();
         }
       });
-      if (Dangerous) continue;
       // We can now check if the local is indeed set to a constant.
       auto iter2 = ConstantIndexes.find(Get->index);
       if (iter2 == ConstantIndexes.end()) continue;

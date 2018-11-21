@@ -35,6 +35,9 @@ added since the original academic paper [1] was published about it.
 
 #include "wasm.h"
 #include "wasm-builder.h"
+#ifdef RELOOPER_DEBUG
+#include "wasm-printing.h"
+#endif
 
 namespace CFG {
 

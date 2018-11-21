@@ -573,3 +573,66 @@
   )
  )
 )
+(module
+ (type $0 (func (param i32)))
+ (func $jump-threading (; 0 ;) (type $0) (param $a i32)
+  (local $x i32)
+  (local $2 i32)
+  (block $block$3$break
+   (set_local $x
+    (i32.const 0)
+   )
+   (block
+    (br $block$3$break)
+   )
+  )
+  (block
+   (block
+    (call $jump-threading
+     (i32.const 3)
+    )
+    (return)
+   )
+  )
+ )
+ (func $jump-threading-1 (; 1 ;) (type $0) (param $a i32)
+  (local $x i32)
+  (local $2 i32)
+  (block $block$5$break
+   (set_local $x
+    (i32.const 2)
+   )
+   (block
+    (br $block$5$break)
+   )
+  )
+  (loop $shape$1$continue
+   (block $block$4$break
+    (block
+     (call $jump-threading-1
+      (i32.const 1)
+     )
+     (set_local $x
+      (i32.const 1)
+     )
+    )
+    (block
+     (br $block$4$break)
+    )
+   )
+   (block
+    (block
+     (call $jump-threading-1
+      (i32.const 2)
+     )
+     (set_local $x
+      (i32.const 2)
+     )
+    )
+    (block
+     (br $shape$1$continue)
+    )
+   )
+  )
+ )
+)

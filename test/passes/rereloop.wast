@@ -218,4 +218,48 @@
   (return (get_global $global$0))
  )
 )
-
+(module
+ ;; 0 -> 3
+ (func $jump-threading (param $a i32)
+  (local $x i32)
+  (set_local $x (i32.const 0))
+  (loop $l
+   (block $a
+    (block $b
+     (block $c
+      (br_table $a $b $c $a $b $c $a $b $c (get_local $x))
+     )
+     (call $jump-threading (i32.const 1))
+     (set_local $x (i32.const 1))
+     (br $l)
+    )
+    (call $jump-threading (i32.const 2))
+    (set_local $x (i32.const 2))
+    (br $l)
+   )
+  )
+  (call $jump-threading (i32.const 3))
+ )
+ ;; 2 -> 1 -> 2 -> ..
+ (func $jump-threading-1 (param $a i32)
+  (local $x i32)
+  (set_local $x (i32.const 2))
+  (loop $l
+   (block $a
+    (block $b
+     (block $c
+      (br_table $a $b $c $a $b $c $a $b $c (get_local $x))
+     )
+     (call $jump-threading-1 (i32.const 1))
+     (set_local $x (i32.const 1))
+     (br $l)
+    )
+    (call $jump-threading-1 (i32.const 2))
+    (set_local $x (i32.const 2))
+    (br $l)
+   )
+  )
+  (call $jump-threading-1 (i32.const 3))
+ )
+ ;; TODO corner cases
+)
