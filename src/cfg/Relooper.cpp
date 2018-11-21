@@ -471,7 +471,16 @@ struct Liveness : public RelooperRecursor {
   }
 };
 
-typedef std::pair<Branch*, Block*> BranchBlock;
+struct BranchBlock {
+  Branch* Branch_;
+  Block* Block_;
+
+  BranchBlock() {}
+  BranchBlock(Branch* Branch_, Block* Block_) : Branch_(Branch_), Block_(Block_) {}
+  // Useful constructor for iteration on BranchesOut
+  template<typename T>
+  BranchBlock(T& iter) : Branch_(iter.second), Block_(iter.first) {}
+};
 
 struct Optimizer : public RelooperRecursor {
   Optimizer(Relooper* Parent) : RelooperRecursor(Parent) {
@@ -621,8 +630,8 @@ struct Optimizer : public RelooperRecursor {
           // Check if we are equivalent to any of them - if so, merge us.
           bool Merged = false;
           for (auto& Pair : HashedSiblings) {
-            Branch* SiblingBranch = Pair.first;
-            Block* SiblingBlock = Pair.second;
+            Branch* SiblingBranch = Pair.Branch_;
+            Block* SiblingBlock = Pair.Block_;
             if (HaveEquivalentContents(CurrBlock, SiblingBlock)) {
 #if RELOOPER_OPTIMIZER_DEBUG
               std::cout << "    equiv! to " << SiblingBlock->Id << '\n';
@@ -779,14 +788,14 @@ struct Optimizer : public RelooperRecursor {
       });
       if (Dangerous) continue;
       // We can now check if the local is indeed set to a constant.
-      auto iter = ConstantIndexes.find(Get->index);
-      if (iter == ConstantIndexes.end()) continue;
+      auto iter2 = ConstantIndexes.find(Get->index);
+      if (iter2 == ConstantIndexes.end()) continue;
       // We can tell which branch is taken statically, using
       // the value of the local.
-      auto LocalValue = iter->second->getInteger();
+      auto LocalValue = iter2->second.getInteger();
       BranchBlock SwitchBranchBlock = GetSwitchBranchBlock(SwitchBlock, LocalValue);
-      auto* SwitchBranch = SwitchBranchBlock.first;
-      auto* TargetBlock = SwitchBranchBlock.second;
+      auto* SwitchBranch = SwitchBranchBlock.Branch_;
+      auto* TargetBlock = SwitchBranchBlock.Block_;
       // We can't skip code in a phi (TODO: we could copy it)
       if (SwitchBranch->Code) continue;
       // Yes, we can do this!
@@ -1035,10 +1044,10 @@ private:
   // item or a block with no name of items. This calls once per item in the block,
   // or once for the singleton.
   template<typename T>
-  void walkCanonicalizedItems(wasm::Expression* Code, T& Operation) {
+  void walkCanonicalizedItems(wasm::Expression* Code, T Operation) {
     if (auto* Block = Code->dynCast<wasm::Block>()) {
       assert(!Block->name.is());
-      for auto* Item : Block->list) {
+      for (auto* Item : Block->list) {
         Operation(Item);
       }
     } else {
@@ -1049,18 +1058,18 @@ private:
   BranchBlock GetSwitchBranchBlock(Block* SwitchBlock, wasm::Index LocalValue) {
     BranchBlock Default;
     for (auto& iter : SwitchBlock->BranchesOut) {
-      auto CurrBranchBlock = BranchBlock(iter);
-      if (!CurrBranch->SwitchValues) {
-        Default = CurrBranchBlock;
+      auto Curr = BranchBlock(iter);
+      if (!Curr.Branch_->SwitchValues) {
+        Default = Curr;
       } else {
-        for (auto i : *CurrBranch->SwitchValues) {
+        for (auto i : *Curr.Branch_->SwitchValues) {
           if (i == LocalValue) {
-            return CurrBranchBlock;
+            return Curr;
           }
         }
       }
     }
-    assert(Default->first && Default->second);
+    assert(Default.Branch_ && Default.Block_);
     return Default;
   }
 };
