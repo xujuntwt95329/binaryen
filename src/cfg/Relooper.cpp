@@ -494,6 +494,7 @@ struct Optimizer : public RelooperRecursor {
       More = MergeEquivalentBranches() || More;
       More = UnSwitch() || More;
       More = MergeConsecutiveBlocks() || More;
+      More = ThreadJumps() || More;
       // TODO: Merge identical blocks. This would avoid taking into account their
       // position / how they are reached, which means that the merging
       // may add overhead, so we do it carefully:
@@ -713,6 +714,90 @@ struct Optimizer : public RelooperRecursor {
           assert(!iter.second->SwitchValues);
         }
       }
+    }
+    return Worked;
+  }
+
+  // Simple jump threading: when we see a local is set, and we branch to an
+  // empty block with a switch that uses that local, so that we can tell the
+  // branch target statically, add a direct branch to there.
+  // TODO: This handles just the simple and obvious case of a single branch
+  //       to the switch, and all without phis, and we don't do a full flow
+  //       analysis of locals etc. We also could handle non-switch jump
+  //       threading. The current code should be enough for the
+  //       simple "switch-in-a-loop" construct that e.g. the LLVM wasm backend
+  //       emits when it thinks it sees irreducible control flow.
+  bool ThreadJumps() {
+    bool Worked = false;
+    for (auto* ParentBlock : Parent->Blocks) {
+      // Ignore the case where there is control flow in the parent block -
+      // we want to easily see if a local is set.
+      if (ParentBlock->Code->type == wasm::unreachable) continue;
+      // Ignore the wrong number of branches - we want the local to be used
+      // immediately.
+      if (ParentBlock->BranchesOut.size() != 1) continue;
+      auto iter = ParentBlock->BranchesOut.begin();
+      auto* SwitchBlock = iter->first;
+      auto* ParentBranch = iter->second;
+      if (!SwitchBlock->SwitchCondition) continue;
+      // If there are phis, we can't skip them.
+      if (ParentBranch->Code) continue;
+      // If the switch block has code, we can't skip it.
+      if (!IsEmpty(SwitchBlock->Code)) continue;
+      auto* Get = SwitchBlock->SwitchCondition->dynCast<wasm::GetLocal>();
+      if (!Get) continue; 
+      // Ok, we get directly to a switch with a simple get for the condition,
+      // check which locals are set to a constant in ParentBlock.
+      // Rely on canonicalization: the block's code is a nameless wasm Block,
+      // unless it's a singleton item. We look through that block if present,
+      // and look for sets of a constant or of a get; anything else is
+      // dangerous and we must abort.
+      bool Dangerous = false;
+      // Track all locals set to constants, to support simple copies etc.,
+      // which may occur temporarily due to flattening. We keep a map
+      // of index => constant value, if constant
+      std::map<wasm::Index, wasm::Literal> ConstantIndexes;
+      walkCanonicalizedItems(ParentBlock->Code, [&](wasm::Expression* Item) {
+        if (auto* Set = ParentBlock->Code->dynCast<wasm::SetLocal>()) {
+          if (auto* Get = Set->value->dynCast<wasm::GetLocal>()) {
+            // If already constant, copy that constant.
+            auto iter = ConstantIndexes.find(Get->index);
+            if (iter != ConstantIndexes.end()) {
+              ConstantIndexes[Set->index] = iter->second;
+            } else {
+              ConstantIndexes.erase(Set->index);
+            }
+          } else if (auto* Const = Set->value->dynCast<wasm::Const>()) {
+            ConstantIndexes[Set->index] = Const->value;
+          } else {
+            ConstantIndexes.erase(Set->index);
+          }
+        } else {
+          // Not a set - dangerous.
+          Dangerous = true;
+        }
+      });
+      if (Dangerous) continue;
+      // We can now check if the local is indeed set to a constant.
+      auto iter = ConstantIndexes.find(Get->index);
+      if (iter == ConstantIndexes.end()) continue;
+      // We can tell which branch is taken statically, using
+      // the value of the local.
+      auto LocalValue = iter->second->getInteger();
+      BranchBlock SwitchBranchBlock = GetSwitchBranchBlock(SwitchBlock, LocalValue);
+      auto* SwitchBranch = SwitchBranchBlock.first;
+      auto* TargetBlock = SwitchBranchBlock.second;
+      // We can't skip code in a phi (TODO: we could copy it)
+      if (SwitchBranch->Code) continue;
+      // Yes, we can do this!
+      // Reuse the existing branch, which was a simple unconditional one,
+      // same as what we need.
+      ParentBlock->BranchesOut.clear();
+      ParentBlock->BranchesOut[TargetBlock] = ParentBranch;
+      assert(!ParentBranch->Condition && !ParentBranch->SwitchValues);
+      // Note that we do nothing with the SetLocal, which is not used now -
+      // leave that to the optimizer.
+      Worked = true;
     }
     return Worked;
   }
@@ -944,6 +1029,39 @@ private:
       Ret = wasm::ExpressionAnalyzer::hash(Curr->Code);
     }
     return Ret;
+  }
+
+  // Does a simple walk along canonicalized code items, which is either a singleton
+  // item or a block with no name of items. This calls once per item in the block,
+  // or once for the singleton.
+  template<typename T>
+  void walkCanonicalizedItems(wasm::Expression* Code, T& Operation) {
+    if (auto* Block = Code->dynCast<wasm::Block>()) {
+      assert(!Block->name.is());
+      for auto* Item : Block->list) {
+        Operation(Item);
+      }
+    } else {
+      Operation(Code);
+    }
+  }
+
+  BranchBlock GetSwitchBranchBlock(Block* SwitchBlock, wasm::Index LocalValue) {
+    BranchBlock Default;
+    for (auto& iter : SwitchBlock->BranchesOut) {
+      auto CurrBranchBlock = BranchBlock(iter);
+      if (!CurrBranch->SwitchValues) {
+        Default = CurrBranchBlock;
+      } else {
+        for (auto i : *CurrBranch->SwitchValues) {
+          if (i == LocalValue) {
+            return CurrBranchBlock;
+          }
+        }
+      }
+    }
+    assert(Default->first && Default->second);
+    return Default;
   }
 };
 
