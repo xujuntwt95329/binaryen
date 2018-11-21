@@ -550,9 +550,6 @@ struct Optimizer : public RelooperRecursor {
         auto* NextBranch = iter.second;
         auto* First = Next;
         auto* Replacement = First;
-#if RELOOPER_OPTIMIZER_DEBUG
-        std::cout << " maybeskip from " << Block->Id << " to next=" << Next->Id << '\n';
-#endif
         std::unordered_set<decltype(Replacement)> Seen;
         while (1) {
           if (IsEmpty(Next) &&
@@ -582,17 +579,11 @@ struct Optimizer : public RelooperRecursor {
           break;
         }
         if (Replacement != First) {
-#if RELOOPER_OPTIMIZER_DEBUG
-          std::cout << "  skip to replacement! " << CurrBlock->Id << " -> " << First->Id << " -> " << Replacement->Id << '\n';
-#endif
           Worked = true;
         }
         // Add a branch to the target (which may be the unchanged original) in the set of new branches.
         // If it's a replacement, it may collide, and we need to merge.
         if (NewBranchesOut.count(Replacement)) {
-#if RELOOPER_OPTIMIZER_DEBUG
-          std::cout << "  merge\n";
-#endif
           MergeBranchInto(NextBranch, NewBranchesOut[Replacement]);
         } else {
           NewBranchesOut[Replacement] = NextBranch;
@@ -609,17 +600,11 @@ struct Optimizer : public RelooperRecursor {
   bool MergeEquivalentBranches() {
     bool Worked = false;
     for (auto* ParentBlock : Parent->Blocks) {
-#if RELOOPER_OPTIMIZER_DEBUG
-      std::cout << "at parent " << ParentBlock->Id << '\n';
-#endif
       if (ParentBlock->BranchesOut.size() >= 2) {
         std::unordered_map<wasm::HashType, std::vector<BranchBlock>> HashedBranchesOut;
         std::vector<Block*> BlocksToErase;
         for (auto& iter : ParentBlock->BranchesOut) {
           Block* CurrBlock = iter.first;
-#if RELOOPER_OPTIMIZER_DEBUG
-          std::cout << "  consider child " << CurrBlock->Id << '\n';
-#endif
           Branch* CurrBranch = iter.second;
           if (CurrBranch->Code) {
             // We can't merge code; ignore
@@ -633,19 +618,11 @@ struct Optimizer : public RelooperRecursor {
             Branch* SiblingBranch = Pair.Branch_;
             Block* SiblingBlock = Pair.Block_;
             if (HaveEquivalentContents(CurrBlock, SiblingBlock)) {
-#if RELOOPER_OPTIMIZER_DEBUG
-              std::cout << "    equiv! to " << SiblingBlock->Id << '\n';
-#endif
               MergeBranchInto(CurrBranch, SiblingBranch);
               BlocksToErase.push_back(CurrBlock);
               Merged = true;
               Worked = true;
             }
-#if RELOOPER_OPTIMIZER_DEBUG
-            else {
-              std::cout << "    same hash, but not equiv to " << SiblingBlock->Id << '\n';
-            }
-#endif
           }
           if (!Merged) {
             HashedSiblings.emplace_back(CurrBranch, CurrBlock);
@@ -703,14 +680,8 @@ struct Optimizer : public RelooperRecursor {
   bool UnSwitch() {
     bool Worked = false;
     for (auto* ParentBlock : Parent->Blocks) {
-#if RELOOPER_OPTIMIZER_DEBUG
-      std::cout << "un-switching at " << ParentBlock->Id << ' ' << !!ParentBlock->SwitchCondition << ' ' << ParentBlock->BranchesOut.size() << '\n';
-#endif
       if (ParentBlock->SwitchCondition) {
         if (ParentBlock->BranchesOut.size() <= 1) {
-#if RELOOPER_OPTIMIZER_DEBUG
-          std::cout << "  un-switching!: " << ParentBlock->Id << '\n';
-#endif
           ParentBlock->SwitchCondition = nullptr;
           if (!ParentBlock->BranchesOut.empty()) {
             assert(!ParentBlock->BranchesOut.begin()->second->SwitchValues);
@@ -752,6 +723,9 @@ struct Optimizer : public RelooperRecursor {
       // If there are phis, we can't skip them.
       if (ParentBranch->Code) continue;
       // If the switch block has code, we can't skip it.
+      // (Note that flattening may create code here, like a copy of a local
+      // to the local we'll use in the switch condition; running simplify-locals-nonesting
+      // after flatten would avoid that.)
       if (!IsEmpty(SwitchBlock->Code)) continue;
       auto* Get = SwitchBlock->SwitchCondition->dynCast<wasm::GetLocal>();
       if (!Get) continue; 
@@ -766,6 +740,13 @@ struct Optimizer : public RelooperRecursor {
       // which may occur temporarily due to flattening. We keep a map
       // of index => constant value, if constant
       std::map<wasm::Index, wasm::Literal> ConstantIndexes;
+
+
+//
+// XXX this is wrong, a set may have nested weirdness, we need a full walk,
+//     check side effects too probably, etc.
+//
+
       walkCanonicalizedItems(ParentBlock->Code, [&](wasm::Expression* Item) {
         if (auto* Set = Item->dynCast<wasm::SetLocal>()) {
           if (auto* Get = Set->value->dynCast<wasm::GetLocal>()) {
