@@ -1198,4 +1198,22 @@
     (get_local $var$2)
    )
   )
+  (func $just-one-var (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+   (local $3 i32)
+   (set_local $3
+    (get_local $2)
+   )
+   (loop $label$1
+    (if
+     (get_local $3)
+     (block
+      (set_local $3
+       (i32.const 0)
+      )
+      (br $label$1)
+     )
+    )
+   )
+   (i32.const 0)
+  )
 )
