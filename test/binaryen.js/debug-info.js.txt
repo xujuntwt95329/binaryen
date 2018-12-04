@@ -1,5 +1,53 @@
+atexit() called, but EXIT_RUNTIME is not set, so atexits() will not be called. set EXIT_RUNTIME to 1 (see the FAQ)
+make a MixedArena 47068
 === default ===
 debugInfo=false
+make a MixedArena 47068
+make a MixedArena 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+make a MixedArena 47068
+make a MixedArena 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
 (module
  (type $0 (func))
  (memory $0 0)
@@ -11,6 +59,52 @@ debugInfo=false
 
 === with debug info ===
 debugInfo=true
+make a MixedArena 47068
+make a MixedArena 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+make a MixedArena 47068
+make a MixedArena 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
 (module
  (type $0 (func))
  (memory $0 0)
@@ -22,6 +116,52 @@ debugInfo=true
 
 === without debug info ===
 debugInfo=false
+make a MixedArena 47068
+make a MixedArena 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+make a MixedArena 47068
+make a MixedArena 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
+allocSpace on 47068 : 47068
 (module
  (type $0 (func))
  (memory $0 0)

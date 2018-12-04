@@ -1,3 +1,4 @@
+#include <wasm-printing.h>
 /*
  * Copyright 2016 WebAssembly Community Group participants
  *
@@ -493,6 +494,7 @@ struct Optimizer : public RelooperRecursor {
       More = SkipEmptyBlocks() || More;
       More = MergeEquivalentBranches() || More;
       More = UnSwitch() || More;
+      More = Switchify() || More;
       More = MergeConsecutiveBlocks() || More;
       // TODO: Merge identical blocks. This would avoid taking into account their
       // position / how they are reached, which means that the merging
@@ -709,9 +711,133 @@ struct Optimizer : public RelooperRecursor {
         }
       } else {
         // If the block has no switch, the branches must not as well.
+        // TODO: proper validation elsewhere
         for (auto& iter : ParentBlock->BranchesOut) {
           assert(!iter.second->SwitchValues);
         }
+      }
+    }
+    return Worked;
+  }
+
+  // Emit switches when effective to do so.
+  bool Switchify() {
+    bool Worked = false;
+    for (auto* ParentBlock : Parent->Blocks) {
+std::cout << "un-switching at " << ParentBlock->Id << ' ' << !!ParentBlock->SwitchCondition << ' ' << ParentBlock->BranchesOut.size() << '\n';
+
+// no good - a chain of br_ifs would turn into a sequence of blocks with conditions that line up, and not one block with many bvranches
+      if (!ParentBlock->SwitchCondition) {
+        // Heuristics. These are slightly inspired by the constants from the asm.js backend
+        // and the tablify() code in RemoveUnusedBrs.
+
+        // How many targets we need to see to consider doing this.
+        const uint32_t MIN_NUM = 3;
+        // How much of a range of values is definitely too big.
+        const uint32_t MAX_RANGE = 1024;
+        // Multiplied by the number of targets, then compared to the range. When
+        // this is high, we allow larger ranges.
+        const uint32_t NUM_TO_RANGE_FACTOR = 3;
+
+        auto NumTargets = ParentBlock->BranchesOut.size();
+        if (NumTargets < MIN_NUM) continue;
+        // We can use a switch if they all compare the same thing to constants. Scan
+        // to find that singleton.
+        // We also handle ors of multiple such expressions.
+        wasm::Expression* SingletonCheckedExpression = nullptr;
+        std::function<bool (wasm::Expression*)> IsCheckedExpression = [&](wasm::Expression* Curr) {
+std::cout << "top " << *Curr << '\n';
+          if (auto* Binary = Curr->dynCast<wasm::Binary>()) {
+            if (Binary->op == wasm::EqInt32) {
+              if (!Binary->right->is<wasm::Const>()) {
+                return false;
+              }
+              auto* Left = Binary->left;
+
+              if (!SingletonCheckedExpression) {
+                SingletonCheckedExpression = Left;
+                return true;
+              } else {
+                return wasm::ExpressionAnalyzer::equal(Left, SingletonCheckedExpression);
+              }
+            } else if (Binary->op == wasm::OrInt32) {
+              return IsCheckedExpression(Binary->left) && IsCheckedExpression(Binary->right);
+            }
+          }
+          return false;
+        };
+        auto GetCheckedNums = [&](wasm::Expression* Curr) {
+          std::vector<uint32_t> Ret;
+          std::function<void (wasm::Expression*)> Recurse = [&](wasm::Expression* Curr) {
+            auto* Binary = Curr->cast<wasm::Binary>();
+            if (Binary->op == wasm::EqInt32) {
+              Ret.push_back(Binary->right->cast<wasm::Const>()->value.geti32());
+            } else {
+              assert(Binary->op == wasm::OrInt32);
+              Recurse(Binary->left);
+              Recurse(Binary->right);
+            }
+          };
+          Recurse(Curr);
+          return Ret;
+        };
+
+        bool ok = true;
+        for (auto& Pair : ParentBlock->BranchesOut) {
+          Branch* Br = Pair.second;
+          if (Br->Condition) {
+            if (!IsCheckedExpression(Br->Condition)) {
+              ok = false;
+              break;
+            }
+          }
+        }
+        if (!ok) continue;
+        // They are all checking the same singleton expression.
+        uint32_t Min = -1, Max = -1;
+        bool seen = false;
+        for (auto& Pair : ParentBlock->BranchesOut) {
+          Branch* Br = Pair.second;
+          if (Br->Condition) {
+            auto Nums = GetCheckedNums(Br->Condition);
+            for (auto Num : Nums) {
+              if (!seen) {
+                Min = Max = Num;
+                seen = true;
+              } else {
+                Min = std::min(Min, Num);
+                Max = std::max(Max, Num);
+              }
+            }
+          }
+        }
+        auto Range = Max - Min;
+        if (Range >= MAX_RANGE ||
+            Range >= NumTargets * NUM_TO_RANGE_FACTOR) {
+          continue;
+        }
+        // Looks good, do it!
+        if (Min > 0) {
+          wasm::Builder Builder(*Parent->Module);
+          SingletonCheckedExpression = Builder.makeBinary(
+            wasm::SubInt32,
+            SingletonCheckedExpression,
+            Builder.makeConst(wasm::Literal(Min))
+          );
+        }
+        ParentBlock->SwitchCondition = SingletonCheckedExpression;
+        for (auto& Pair : ParentBlock->BranchesOut) {
+          Branch* Br = Pair.second;
+          if (Br->Condition) {
+            auto Nums = GetCheckedNums(Br->Condition);
+            auto SwitchValues = wasm::make_unique<std::vector<wasm::Index>>();
+            for (auto Num : Nums) {
+              SwitchValues->push_back(wasm::Index(Num - Min));
+            }
+            Br->SwitchValues = std::move(SwitchValues);
+          }
+        }
+        Worked = true;
       }
     }
     return Worked;
