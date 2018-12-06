@@ -725,9 +725,17 @@ struct Optimizer : public RelooperRecursor {
     bool Worked = false;
     for (auto* ParentBlock : Parent->Blocks) {
 std::cout << "un-switching at " << ParentBlock->Id << ' ' << !!ParentBlock->SwitchCondition << ' ' << ParentBlock->BranchesOut.size() << '\n';
-
-// no good - a chain of br_ifs would turn into a sequence of blocks with conditions that line up, and not one block with many bvranches
+std::cout << *ParentBlock->Code << '\n';
       if (!ParentBlock->SwitchCondition) {
+        // We can optimize two simple patterns: a block with several successors, each checking
+        // the same expression against a constant, or what --flatten leads to from that, which
+        // is a sequence of blocks, each with a set_local of a comparison to a constant, and
+        // the condition is a get of that same local. We could "compress" the latter into the
+        // former as a first step, but note that we don't want to do it if we can't actually
+        // emit a switch, as we are making all those sets be executed unconditionally, whereas
+        // before after the first we might have skipped some, so instead we compress only
+        // blocks where things fit our pattern.
+
         // Heuristics. These are slightly inspired by the constants from the asm.js backend
         // and the tablify() code in RemoveUnusedBrs.
 
