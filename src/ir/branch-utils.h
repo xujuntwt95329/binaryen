@@ -185,19 +185,30 @@ struct BranchSeeker : public PostWalker<BranchSeeker> {
   }
 };
 
+// Check if unreachable code starts in this very node, that is, it stops
+// normal control flow and does not flow out.
+inline bool startsUnreachableCode(Expression* curr) {
+  if (auto* br = curr->dynCast<Break>()) {
+    return !br->condition;
+  } else if (curr->is<Switch>() ||
+             curr->is<Return>() ||
+             curr->is<Unreachable>()) {
+    return true;
+  }
+  return false;
+}
+
 // Check if control flow can flow out of the given expression. That does not
 // include branches out to a higher scope. It roughly corresponds to an expression
 // having the "unreachable" type in older Binaryen versions.
 inline bool flowsOut(Expression* curr) {
+  if (startsUnreachableCode(curr)) {
+    return false;
+  }
   if (auto* iff = curr->dynCast<If>()) {
     return flowsOut(iff->condition) &&
            (!iff->ifFalse ||
             flowsOut(iff->ifTrue) || flowsOut(iff->ifFalse));
-  } else if (auto* br = curr->dynCast<Break>()) {
-    return br->condition && flowsOut(br->condition) &&
-           (!br->value || flowsOut(br->value));
-  } else if (curr->is<Switch>() || curr->is<Unreachable>()) {
-    return false;
   }
   // Otherwise, see if any children do not flow out.
   for (auto* child : ChildIterator(curr)) {
