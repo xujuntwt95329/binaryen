@@ -133,17 +133,6 @@ struct ValidationInfo {
   }
 
   template<typename T, typename S>
-  bool shouldBeEqualOrFirstIsUnreachable(S left, S right, T curr, const char* text, Function* func = nullptr) {
-    if (left != unreachable && left != right) {
-      std::ostringstream ss;
-      ss << left << " != " << right << ": " << text;
-      fail(ss.str(), curr, func);
-      return false;
-    }
-    return true;
-  }
-
-  template<typename T, typename S>
   bool shouldBeUnequal(S left, S right, T curr, const char* text, Function* func = nullptr) {
     if (left == right) {
       std::ostringstream ss;
@@ -153,17 +142,6 @@ struct ValidationInfo {
     }
     return true;
   }
-
-  void shouldBeIntOrUnreachable(Type ty, Expression* curr, const char* text, Function* func = nullptr) {
-    switch (ty) {
-      case i32:
-      case i64: {
-        break;
-      }
-      default: fail(text, curr, func);
-    }
-  }
-
 };
 
 struct FunctionValidator : public WalkerPass<PostWalker<FunctionValidator>> {
@@ -196,7 +174,7 @@ struct FunctionValidator : public WalkerPass<PostWalker<FunctionValidator>> {
 
   std::unordered_map<Name, BreakInfo> breakInfos;
 
-  Type returnType = unreachable; // type used in returns
+  Type returnType = none; // type used in returns
 
   std::unordered_set<Name> labelNames; // Binaryen IR requires that label names must be unique - IR generators must ensure that
 
@@ -278,17 +256,8 @@ private:
   }
 
   template<typename T, typename S>
-  bool shouldBeEqualOrFirstIsUnreachable(S left, S right, T curr, const char* text) {
-    return info.shouldBeEqualOrFirstIsUnreachable(left, right, curr, text, getFunction());
-  }
-
-  template<typename T, typename S>
   bool shouldBeUnequal(S left, S right, T curr, const char* text) {
     return info.shouldBeUnequal(left, right, curr, text, getFunction());
-  }
-
-  void shouldBeIntOrUnreachable(Type ty, Expression* curr, const char* text) {
-    return info.shouldBeIntOrUnreachable(ty, curr, text, getFunction());
   }
 
   void validateAlignment(size_t align, Type type, Index bytes, bool isAtomic,
@@ -320,13 +289,13 @@ void FunctionValidator::visitBlock(Block* curr) {
       if (isConcreteType(info.type) && isConcreteType(curr->type)) {
         shouldBeEqual(curr->type, info.type, curr, "block+breaks must have right type if breaks return a value");
       }
-      if (isConcreteType(curr->type) && info.arity && info.type != unreachable) {
+      if (isConcreteType(curr->type) && info.arity) {
         shouldBeEqual(curr->type, info.type, curr, "block+breaks must have right type if breaks have arity");
       }
       shouldBeTrue(info.arity != BreakInfo::PoisonArity, curr, "break arities must match");
       if (curr->list.size() > 0) {
         auto last = curr->list.back()->type;
-        if (isConcreteType(last) && info.type != unreachable) {
+        if (isConcreteType(last)) {
           shouldBeEqual(last, info.type, curr, "block+breaks must have right type if block ends with a reachable value");
         }
         if (last == none) {
@@ -377,7 +346,7 @@ void FunctionValidator::visitLoop(Loop* curr) {
 }
 
 void FunctionValidator::visitIf(If* curr) {
-  shouldBeTrue(curr->condition->type == unreachable || curr->condition->type == i32, curr, "if condition must be valid");
+  shouldBeTrue(curr->condition->type == none || curr->condition->type == i32, curr, "if condition must be valid");
   if (!curr->ifFalse) {
     shouldBeFalse(isConcreteType(curr->ifTrue->type), curr, "if without else must not return a value in body");
     if (curr->condition->type != unreachable) {
