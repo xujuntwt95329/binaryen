@@ -87,19 +87,6 @@ struct ExpressionAnalyzer {
 // various ways that require propagating types around, and it does such an
 // "incremental" update. This is done under the assumption that there is
 // a valid assignment of types to apply.
-// This removes "unnecessary' block/if/loop types, i.e., that are added
-// specifically, as in
-//  (block (result i32) (unreachable))
-// vs
-//  (block (unreachable))
-// This converts to the latter form.
-// This also removes un-taken branches that would be a problem for
-// refinalization: if a block has been marked unreachable, and has
-// branches to it with values of type unreachable, then we don't
-// know the type for the block: it can't be none since the breaks
-// exist, but the breaks don't declare the type, rather everything
-// depends on the block. To avoid looking at the parent or something
-// else, just remove such un-taken branches.
 struct ReFinalize : public WalkerPass<PostWalker<ReFinalize, OverriddenVisitor<ReFinalize>>> {
   bool isFunctionParallel() override { return true; }
 
@@ -156,9 +143,6 @@ struct ReFinalize : public WalkerPass<PostWalker<ReFinalize, OverriddenVisitor<R
 private:
   void updateBreakValueType(Name name, Type type);
 
-  // Replace an untaken branch/switch with an unreachable value.
-  // A condition may also exist and may or may not be unreachable.
-  void replaceUntaken(Expression* value, Expression* condition);
 };
 
 // Re-finalize a single node. This is slow, if you want to refinalize
@@ -251,7 +235,7 @@ struct AutoDrop : public WalkerPass<ExpressionStackWalker<AutoDrop>> {
     }
     if (maybeDrop(curr->list.back())) {
       reFinalize();
-      assert(curr->type == none || curr->type == unreachable);
+      assert(curr->type == none);
     }
   }
 
