@@ -29,7 +29,6 @@ const char* printType(Type type) {
     case Type::f32: return "f32";
     case Type::f64: return "f64";
     case Type::v128: return "v128";
-    case Type::unreachable: return "unreachable";
   }
   WASM_UNREACHABLE();
 }
@@ -42,7 +41,6 @@ unsigned getTypeSize(Type type) {
     case Type::f32: return 4;
     case Type::f64: return 8;
     case Type::v128: return 16;
-    case Type::unreachable: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }
@@ -55,12 +53,8 @@ Type getType(unsigned size, bool float_) {
   WASM_UNREACHABLE();
 }
 
-Type getReachableType(Type a, Type b) {
-  return a != unreachable ? a : b;
-}
-
 bool isConcreteType(Type type) {
-  return type != none && type != unreachable;
+  return type != none;
 }
 
 bool isIntegerType(Type type) {

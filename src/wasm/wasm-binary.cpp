@@ -1363,7 +1363,7 @@ void WasmBinaryBuilder::processExpressions() {
       return;
     }
     expressionStack.push_back(curr);
-    if (curr->type == unreachable) {
+    if (!BranchUtils::flowsOut(curr)) {
       // once we see something unreachable, we don't want to add anything else
       // to the stack, as it could be stacky code that is non-representable in
       // our AST. but we do need to skip it
@@ -1460,9 +1460,6 @@ Expression* WasmBinaryBuilder::popNonVoidExpression() {
     auto local = builder.addVar(currFunction, type);
     block->list[0] = builder.makeSetLocal(local, block->list[0]);
     block->list.push_back(builder.makeGetLocal(local, type));
-  } else {
-    assert(type == unreachable);
-    // nothing to do here - unreachable anyhow
   }
   block->finalize();
   return block;
@@ -1833,7 +1830,7 @@ void WasmBinaryBuilder::visitBlock(Block* curr) {
 
 Expression* WasmBinaryBuilder::getBlockOrSingleton(Type type) {
   Name label = getNextLabel();
-  breakStack.push_back({label, type != none && type != unreachable});
+  breakStack.push_back({label, type != none});
   auto start = expressionStack.size();
   processExpressions();
   size_t end = expressionStack.size();

@@ -553,7 +553,7 @@ void StackWriter<Mode, Parent>::visitLoad(Load* curr) {
           case 1: o << int8_t(curr->signed_ ? BinaryConsts::I32LoadMem8S : BinaryConsts::I32LoadMem8U); break;
           case 2: o << int8_t(curr->signed_ ? BinaryConsts::I32LoadMem16S : BinaryConsts::I32LoadMem16U); break;
           case 4: o << int8_t(BinaryConsts::I32LoadMem); break;
-          default: abort();
+          default: WASM_UNREACHABLE();
         }
         break;
       }
@@ -563,7 +563,7 @@ void StackWriter<Mode, Parent>::visitLoad(Load* curr) {
           case 2: o << int8_t(curr->signed_ ? BinaryConsts::I64LoadMem16S : BinaryConsts::I64LoadMem16U); break;
           case 4: o << int8_t(curr->signed_ ? BinaryConsts::I64LoadMem32S : BinaryConsts::I64LoadMem32U); break;
           case 8: o << int8_t(BinaryConsts::I64LoadMem); break;
-          default: abort();
+          default: WASM_UNREACHABLE();
         }
         break;
       }
@@ -613,7 +613,7 @@ void StackWriter<Mode, Parent>::visitStore(Store* curr) {
           case 1: o << int8_t(BinaryConsts::I32StoreMem8); break;
           case 2: o << int8_t(BinaryConsts::I32StoreMem16); break;
           case 4: o << int8_t(BinaryConsts::I32StoreMem); break;
-          default: abort();
+          default: WASM_UNREACHABLE();
         }
         break;
       }
@@ -623,14 +623,14 @@ void StackWriter<Mode, Parent>::visitStore(Store* curr) {
           case 2: o << int8_t(BinaryConsts::I64StoreMem16); break;
           case 4: o << int8_t(BinaryConsts::I64StoreMem32); break;
           case 8: o << int8_t(BinaryConsts::I64StoreMem); break;
-          default: abort();
+          default: WASM_UNREACHABLE();
         }
         break;
       }
       case f32: o << int8_t(BinaryConsts::F32StoreMem); break;
       case f64: o << int8_t(BinaryConsts::F64StoreMem); break;
       case v128: o << int8_t(BinaryConsts::SIMDPrefix) << U32LEB(BinaryConsts::V128Store); break;
-      case none:
+      case none: WASM_UNREACHABLE();
     }
   } else {
     o << int8_t(BinaryConsts::AtomicPrefix);

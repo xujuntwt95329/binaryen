@@ -19,6 +19,7 @@
 
 #include "wasm.h"
 #include "wasm-traversal.h"
+#include "ir/iteration.h"
 
 namespace wasm {
 
@@ -183,6 +184,29 @@ struct BranchSeeker : public PostWalker<BranchSeeker> {
     return seeker.found;
   }
 };
+
+// Check if control flow can flow out of the given expression. That does not
+// include branches out to a higher scope. It roughly corresponds to an expression
+// having the "unreachable" type in older Binaryen versions.
+inline bool flowsOut(Expression* curr) {
+  if (auto* iff = curr->dynCast<If>()) {
+    return flowsOut(iff->condition) &&
+           (!iff->ifFalse ||
+            flowsOut(iff->ifTrue) || flowsOut(iff->iffFalse));
+  } else if (auto* br = curr->dynCast<Break>()) {
+    return br->condition && flowsOut(br->condition) &&
+           (!br->value || flowsOut(br->value));
+  } else if (curr->is<Switch>() || curr->is<Unreachable>()) {
+    return false;
+  }
+  // Otherwise, see if any children do not flow out.
+  for (auto* child : ChildIterator(curr)) {
+    if (flowsOut(child)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 } // namespace BranchUtils
 
