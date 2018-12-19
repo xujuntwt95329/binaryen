@@ -24,27 +24,6 @@ namespace wasm {
 
 namespace BranchUtils {
 
-// Some branches are obviously not actually reachable (e.g. (br $out (unreachable)))
-
-inline bool isBranchReachable(Break* br) {
-  return !(br->value     && br->value->type     == unreachable) &&
-         !(br->condition && br->condition->type == unreachable);
-}
-
-inline bool isBranchReachable(Switch* sw) {
-  return !(sw->value && sw->value->type     == unreachable) &&
-                        sw->condition->type != unreachable;
-}
-
-inline bool isBranchReachable(Expression* expr) {
-  if (auto* br = expr->dynCast<Break>()) {
-    return isBranchReachable(br);
-  } else if (auto* sw = expr->dynCast<Switch>()) {
-    return isBranchReachable(sw);
-  }
-  WASM_UNREACHABLE();
-}
-
 inline std::set<Name> getUniqueTargets(Break* br) {
   std::set<Name> ret;
   ret.insert(br->name);
@@ -156,27 +135,17 @@ struct BranchSeeker : public PostWalker<BranchSeeker> {
 
   void noteFound(Expression* value) {
     found++;
-    if (found == 1) valueType = unreachable;
+    if (found == 1) valueType = none;
     if (!value) valueType = none;
-    else if (value->type != unreachable) valueType = value->type;
+    else if (value->type != none) valueType = value->type;
   }
 
   void visitBreak(Break *curr) {
-    if (!named) {
-      // ignore an unreachable break
-      if (curr->condition && curr->condition->type == unreachable) return;
-      if (curr->value && curr->value->type == unreachable) return;
-    }
     // check the break
     if (curr->name == target) noteFound(curr->value);
   }
 
   void visitSwitch(Switch *curr) {
-    if (!named) {
-      // ignore an unreachable switch
-      if (curr->condition->type == unreachable) return;
-      if (curr->value && curr->value->type == unreachable) return;
-    }
     // check the switch
     for (auto name : curr->targets) {
       if (name == target) noteFound(curr->value);

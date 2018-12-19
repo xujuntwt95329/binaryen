@@ -522,7 +522,6 @@ public:
         break;
       }
       case none: return ExpressionManipulator::nop(curr);
-      case unreachable: return ExpressionManipulator::convert<T, Unreachable>(curr);
     }
     return makeConst(value);
   }

@@ -214,8 +214,7 @@ inline Expression* parseConst(cashew::IString s, Type type, MixedArena& allocato
       break;
     }
     case v128: WASM_UNREACHABLE();
-    case none:
-    case unreachable: {
+    case none: {
       return nullptr;
     }
   }

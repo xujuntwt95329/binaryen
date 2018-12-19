@@ -71,8 +71,7 @@ public:
           Literal(x), Literal(int32_t(0)), Literal(int32_t(0)), Literal(int32_t(0))
         }}
       );
-      case none:
-      case unreachable: WASM_UNREACHABLE();
+      case none: WASM_UNREACHABLE();
     }
     WASM_UNREACHABLE();
   }
@@ -380,8 +379,7 @@ template<> struct less<wasm::Literal> {
       case wasm::Type::i64: return a.geti64() < b.geti64();
       case wasm::Type::f64: return a.reinterpreti64() < b.reinterpreti64();
       case wasm::Type::v128: return memcmp(a.getv128Ptr(), b.getv128Ptr(), 16) < 0;
-      case wasm::Type::none:
-      case wasm::Type::unreachable: return false;
+      case wasm::Type::none: return false;
     }
     WASM_UNREACHABLE();
   }

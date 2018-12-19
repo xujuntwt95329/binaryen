@@ -126,8 +126,7 @@ void Literal::getBits(uint8_t (&buf)[16]) const {
     case Type::i64:
     case Type::f64: memcpy(buf, &i64, sizeof(i64)); break;
     case Type::v128: memcpy(buf, &v128, sizeof(v128)); break;
-    case Type::none:
-    case Type::unreachable: WASM_UNREACHABLE();
+    case Type::none: WASM_UNREACHABLE();
   }
 }
 
@@ -228,7 +227,6 @@ std::ostream& operator<<(std::ostream& o, Literal literal) {
     case Type::f32: literal.printFloat(o, literal.getf32()); break;
     case Type::f64: literal.printDouble(o, literal.getf64()); break;
     case Type::v128: o << "i32 "; literal.printVec128(o, literal.getv128()); break;
-    case Type::unreachable: WASM_UNREACHABLE();
   }
   restoreNormalColor(o);
   return o;
@@ -398,8 +396,7 @@ Literal Literal::eqz() const {
     case Type::f32: return eq(Literal(float(0)));
     case Type::f64: return eq(Literal(double(0)));
     case Type::v128:
-    case Type::none:
-    case Type::unreachable: WASM_UNREACHABLE();
+    case Type::none: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }
@@ -411,8 +408,7 @@ Literal Literal::neg() const {
     case Type::f32: return Literal(i32 ^ 0x80000000).castToF32();
     case Type::f64: return Literal(int64_t(i64 ^ 0x8000000000000000ULL)).castToF64();
     case Type::v128:
-    case Type::none:
-    case Type::unreachable: WASM_UNREACHABLE();
+    case Type::none: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }
@@ -424,8 +420,7 @@ Literal Literal::abs() const {
     case Type::f32: return Literal(i32 & 0x7fffffff).castToF32();
     case Type::f64: return Literal(int64_t(i64 & 0x7fffffffffffffffULL)).castToF64();
     case Type::v128:
-    case Type::none:
-    case Type::unreachable: WASM_UNREACHABLE();
+    case Type::none: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }
@@ -492,8 +487,7 @@ Literal Literal::add(const Literal& other) const {
     case Type::f32: return Literal(getf32() + other.getf32());
     case Type::f64: return Literal(getf64() + other.getf64());
     case Type::v128:
-    case Type::none:
-    case Type::unreachable: WASM_UNREACHABLE();
+    case Type::none: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }
@@ -505,8 +499,7 @@ Literal Literal::sub(const Literal& other) const {
     case Type::f32: return Literal(getf32() - other.getf32());
     case Type::f64: return Literal(getf64() - other.getf64());
     case Type::v128:
-    case Type::none:
-    case Type::unreachable: WASM_UNREACHABLE();
+    case Type::none: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }
@@ -591,8 +584,7 @@ Literal Literal::mul(const Literal& other) const {
     case Type::f32: return Literal(getf32() * other.getf32());
     case Type::f64: return Literal(getf64() * other.getf64());
     case Type::v128:
-    case Type::none:
-    case Type::unreachable: WASM_UNREACHABLE();
+    case Type::none: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }
@@ -746,8 +738,7 @@ Literal Literal::eq(const Literal& other) const {
     case Type::f32: return Literal(getf32() == other.getf32());
     case Type::f64: return Literal(getf64() == other.getf64());
     case Type::v128:
-    case Type::none:
-    case Type::unreachable: WASM_UNREACHABLE();
+    case Type::none: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }
@@ -759,8 +750,7 @@ Literal Literal::ne(const Literal& other) const {
     case Type::f32: return Literal(getf32() != other.getf32());
     case Type::f64: return Literal(getf64() != other.getf64());
     case Type::v128:
-    case Type::none:
-    case Type::unreachable: WASM_UNREACHABLE();
+    case Type::none: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }

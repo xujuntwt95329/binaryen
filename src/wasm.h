@@ -309,16 +309,8 @@ public:
   void finalize();
 
   // set the type given you know its type, which is the case when parsing
-  // s-expression or binary, as explicit types are given. the only additional work
-  // this does is to set the type to unreachable in the cases that is needed
-  // (which may require scanning the block)
+  // s-expression or binary, as explicit types are given.
   void finalize(Type type_);
-
-  // set the type given you know its type, and you know if there is a break to this
-  // block. this avoids the need to scan the contents of the block in the case that
-  // it might be unreachable, so it is recommended if you already know the type
-  // and breakability anyhow.
-  void finalize(Type type_, bool hasBreak);
 };
 
 class If : public SpecificExpression<Expression::IfId> {
@@ -360,7 +352,7 @@ class Break : public SpecificExpression<Expression::BreakId> {
 public:
   Break() : value(nullptr), condition(nullptr) {}
   Break(MixedArena& allocator) : Break() {
-    type = unreachable;
+    type = none;
   }
 
   Name name;
@@ -373,7 +365,7 @@ public:
 class Switch : public SpecificExpression<Expression::SwitchId> {
 public:
   Switch(MixedArena& allocator) : targets(allocator), condition(nullptr), value(nullptr) {
-    type = unreachable;
+    type = none;
   }
 
   ArenaVector<Name> targets;
@@ -675,7 +667,7 @@ public:
 class Return : public SpecificExpression<Expression::ReturnId> {
 public:
   Return() : value(nullptr) {
-    type = unreachable;
+    type = none;
   }
   Return(MixedArena& allocator) : Return() {}
 
@@ -696,7 +688,7 @@ public:
 class Unreachable : public SpecificExpression<Expression::UnreachableId> {
 public:
   Unreachable() {
-    type = unreachable;
+    type = none;
   }
   Unreachable(MixedArena& allocator) : Unreachable() {}
 };

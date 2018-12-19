@@ -162,72 +162,19 @@ struct TypeSeeker : public PostWalker<TypeSeeker> {
 };
 
 static Type mergeTypes(std::vector<Type>& types) {
-  Type type = unreachable;
   for (auto other : types) {
-    // once none, stop. it then indicates a poison value, that must not be consumed
-    // and ignore unreachable
-    if (type != none) {
-      if (other == none) {
-        type = none;
-      } else if (other != unreachable) {
-        if (type == unreachable) {
-          type = other;
-        } else if (type != other) {
-          type = none; // poison value, we saw multiple types; this should not be consumed
-        }
-      }
+    if (other != none) {
+      return other;
     }
   }
-  return type;
-}
-
-// a block is unreachable if one of its elements is unreachable,
-// and there are no branches to it
-static void handleUnreachable(Block* block, bool breakabilityKnown=false, bool hasBreak=false) {
-  if (block->type == unreachable) return; // nothing to do
-  if (block->list.size() == 0) return; // nothing to do
-  // if we are concrete, stop - even an unreachable child
-  // won't change that (since we have a break with a value,
-  // or the final child flows out a value)
-  if (isConcreteType(block->type)) return;
-  // look for an unreachable child
-  for (auto* child : block->list) {
-    if (child->type == unreachable) {
-      // there is an unreachable child, so we are unreachable, unless we have a break
-      if (!breakabilityKnown) {
-        hasBreak = BranchUtils::BranchSeeker::hasNamed(block, block->name);
-      }
-      if (!hasBreak) {
-        block->type = unreachable;
-      }
-      return;
-    }
-  }
+  return none;
 }
 
 void Block::finalize() {
   if (!name.is()) {
     if (list.size() > 0) {
       // nothing branches here, so this is easy
-      // normally the type is the type of the final child
       type = list.back()->type;
-      // and even if we have an unreachable child somewhere,
-      // we still mark ourselves as having that type,
-      // (block (result i32)
-      //  (return)
-      //  (i32.const 10)
-      // )
-      if (isConcreteType(type)) return;
-      // if we are unreachable, we are done
-      if (type == unreachable) return;
-      // we may still be unreachable if we have an unreachable
-      // child
-      for (auto* child : list) {
-        if (child->type == unreachable) {
-          type = unreachable;
-          return;
-        }
-      }
     } else {
       type = none;
     }
@@ -236,37 +183,23 @@ void Block::finalize() {
 
   TypeSeeker seeker(this, this->name);
   type = mergeTypes(seeker.types);
-  handleUnreachable(this);
 }
 
 void Block::finalize(Type type_) {
   type = type_;
-  if (type == none && list.size() > 0) {
-    handleUnreachable(this);
-  }
-}
-
-void Block::finalize(Type type_, bool hasBreak) {
-  type = type_;
-  if (type == none && list.size() > 0) {
-    handleUnreachable(this, true, hasBreak);
-  }
 }
 
 void If::finalize(Type type_) {
   type = type_;
-  if (type == none && (condition->type == unreachable || (ifFalse && ifTrue->type == unreachable && ifFalse->type == unreachable))) {
-    type = unreachable;
-  }
 }
 
 void If::finalize() {
   if (ifFalse) {
     if (ifTrue->type == ifFalse->type) {
       type = ifTrue->type;
-    } else if (isConcreteType(ifTrue->type) && ifFalse->type == unreachable) {
+    } else if (isConcreteType(ifTrue->type)) {
       type = ifTrue->type;
-    } else if (isConcreteType(ifFalse->type) && ifTrue->type == unreachable) {
+    } else if (isConcreteType(ifFalse->type)) {
       type = ifFalse->type;
     } else {
       type = none;
@@ -274,24 +207,10 @@ void If::finalize() {
   } else {
     type = none; // if without else
   }
-  // if the arms return a value, leave it even if the condition
-  // is unreachable, we still mark ourselves as having that type, e.g.
-  // (if (result i32)
-  //  (unreachable)
-  //  (i32.const 10)
-  //  (i32.const 20
-  // )
-  // otherwise, if the condition is unreachable, so is the if
-  if (type == none && condition->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void Loop::finalize(Type type_) {
   type = type_;
-  if (type == none && body->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void Loop::finalize() {
@@ -300,41 +219,24 @@ void Loop::finalize() {
 
 void Break::finalize() {
   if (condition) {
-    if (condition->type == unreachable) {
-      type = unreachable;
-    } else if (value) {
+    if (value) {
       type = value->type;
     } else {
       type = none;
     }
   } else {
-    type = unreachable;
+    type = none;
   }
 }
 
 void Switch::finalize() {
-  type = unreachable;
-}
-
-template<typename T>
-void handleUnreachableOperands(T* curr) {
-  for (auto* child : curr->operands) {
-    if (child->type == unreachable) {
-      curr->type = unreachable;
-      break;
-    }
-  }
+  type = none;
 }
 
 void Call::finalize() {
-  handleUnreachableOperands(this);
 }
 
 void CallIndirect::finalize() {
-  handleUnreachableOperands(this);
-  if (target->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 bool FunctionType::structuralComparison(FunctionType& b) {
@@ -361,13 +263,11 @@ bool SetLocal::isTee() {
 void SetLocal::setTee(bool is) {
   if (is) type = value->type;
   else type = none;
-  finalize(); // type may need to be unreachable
+  finalize();
 }
 
 void SetLocal::finalize() {
-  if (value->type == unreachable) {
-    type = unreachable;
-  } else if (isTee()) {
+  if (isTee()) {
     type = value->type;
   } else {
     type = none;
@@ -375,50 +275,28 @@ void SetLocal::finalize() {
 }
 
 void SetGlobal::finalize() {
-  if (value->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void Load::finalize() {
-  if (ptr->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void Store::finalize() {
   assert(valueType != none); // must be set
-  if (ptr->type == unreachable || value->type == unreachable) {
-    type = unreachable;
-  } else {
-    type = none;
-  }
+  type = none;
 }
 
 void AtomicRMW::finalize() {
-  if (ptr->type == unreachable || value->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void AtomicCmpxchg::finalize() {
-  if (ptr->type == unreachable || expected->type == unreachable || replacement->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void AtomicWait::finalize() {
   type = i32;
-  if (ptr->type == unreachable || expected->type == unreachable || timeout->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void AtomicWake::finalize() {
   type = i32;
-  if (ptr->type == unreachable || wakeCount->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void SIMDExtract::finalize() {
@@ -434,41 +312,26 @@ void SIMDExtract::finalize() {
     case ExtractLaneVecF64x2: type = f64; break;
     default: WASM_UNREACHABLE();
   }
-  if (vec->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void SIMDReplace::finalize() {
   assert(vec && value);
   type = v128;
-  if (vec->type == unreachable || value->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void SIMDShuffle::finalize() {
   assert(left && right);
   type = v128;
-  if (left->type == unreachable || right->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void SIMDBitselect::finalize() {
   assert(left && right && cond);
   type = v128;
-  if (left->type == unreachable || right->type == unreachable || cond->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 void SIMDShift::finalize() {
   assert(vec && shift);
   type = v128;
-  if (vec->type == unreachable || shift->type == unreachable) {
-    type = unreachable;
-  }
 }
 
 Const* Const::set(Literal value_) {
@@ -486,10 +349,6 @@ bool Unary::isRelational() {
 }
 
 void Unary::finalize() {
-  if (value->type == unreachable) {
-    type = unreachable;
-    return;
-  }
   switch (op) {
     case ClzInt32:
     case CtzInt32:
@@ -623,9 +482,7 @@ bool Binary::isRelational() {
 
 void Binary::finalize() {
   assert(left && right);
-  if (left->type == unreachable || right->type == unreachable) {
-    type = unreachable;
-  } else if (isRelational()) {
+  if (isRelational()) {
     type = i32;
   } else {
     type = left->type;
@@ -634,19 +491,15 @@ void Binary::finalize() {
 
 void Select::finalize() {
   assert(ifTrue && ifFalse);
-  if (ifTrue->type == unreachable || ifFalse->type == unreachable || condition->type == unreachable) {
-    type = unreachable;
-  } else {
+  if (isConcreteType(ifTrue->type)) {
     type = ifTrue->type;
+  } else {
+    type = ifFalse->type;
   }
 }
 
 void Drop::finalize() {
-  if (value->type == unreachable) {
-    type = unreachable;
-  } else {
-    type = none;
-  }
+  type = none;
 }
 
 void Host::finalize() {
@@ -656,12 +509,7 @@ void Host::finalize() {
       break;
     }
     case GrowMemory: {
-      // if the single operand is not reachable, so are we
-      if (operands[0]->type == unreachable) {
-        type = unreachable;
-      } else {
-        type = i32;
-      }
+      type = i32;
       break;
     }
   }
