@@ -35,8 +35,7 @@ static std::string generateSpecWrapper(Module& wasm) {
         case f32: ret += "(f32.const 0)"; break;
         case f64: ret += "(f64.const 0)"; break;
         case v128: ret += "(v128.const i32 0 0 0 0)"; break;
-        case none:
-        case unreachable: WASM_UNREACHABLE();
+        case none: WASM_UNREACHABLE();
       }
       ret += " ";
     }

@@ -256,7 +256,6 @@ extern "C" void EMSCRIPTEN_KEEPALIVE instantiate() {
         case f32: return Literal((float)ret);
         case f64: return Literal((double)ret);
         case v128: assert(false && "v128 not implemented yet");
-        case unreachable: WASM_UNREACHABLE();
       }
       WASM_UNREACHABLE();
     }

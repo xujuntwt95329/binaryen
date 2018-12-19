@@ -44,7 +44,6 @@ AsmType wasmToAsmType(Type type) {
     case i64: return ASM_INT64;
     case v128: assert(false && "v128 not implemented yet");
     case none: return ASM_NONE;
-    case unreachable: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }
@@ -57,7 +56,6 @@ char getSig(Type type) {
     case f64:  return 'd';
     case v128: return 'V';
     case none: return 'v';
-    case unreachable: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
 }

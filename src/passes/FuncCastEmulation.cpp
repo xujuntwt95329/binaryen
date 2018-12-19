@@ -76,10 +76,6 @@ static Expression* toABI(Expression* value, Module* module) {
       );
       break;
     }
-    case unreachable: {
-      // can leave it, the call isn't taken anyhow
-      break;
-    }
   }
   return value;
 }
@@ -113,10 +109,6 @@ static Expression* fromABI(Expression* value, Type type, Module* module) {
     }
     case none: {
       value = builder.makeDrop(value);
-    }
-    case unreachable: {
-      // can leave it, the call isn't taken anyhow
-      break;
     }
   }
   return value;

@@ -192,7 +192,7 @@ inline bool flowsOut(Expression* curr) {
   if (auto* iff = curr->dynCast<If>()) {
     return flowsOut(iff->condition) &&
            (!iff->ifFalse ||
-            flowsOut(iff->ifTrue) || flowsOut(iff->iffFalse));
+            flowsOut(iff->ifTrue) || flowsOut(iff->ifFalse));
   } else if (auto* br = curr->dynCast<Break>()) {
     return br->condition && flowsOut(br->condition) &&
            (!br->value || flowsOut(br->value));

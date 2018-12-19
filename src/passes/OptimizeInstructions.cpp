@@ -127,7 +127,6 @@ Index getMaxBits(Expression* curr, LocalInfoProvider* localInfoProvider) {
   switch (curr->type) {
     case i32: return 32;
     case i64: return 64;
-    case unreachable: return 64; // not interesting, but don't crash
     default: WASM_UNREACHABLE();
   }
 }

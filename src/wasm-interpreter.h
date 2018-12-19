@@ -781,8 +781,7 @@ public:
         case f32: return Literal(load32u(addr)).castToF32();
         case f64: return Literal(load64u(addr)).castToF64();
         case v128: return Literal(load128(addr).data());
-        case none:
-        case unreachable: WASM_UNREACHABLE();
+        case none: WASM_UNREACHABLE();
       }
       WASM_UNREACHABLE();
     }
@@ -811,8 +810,7 @@ public:
         case f32: store32(addr, value.reinterpreti32()); break;
         case f64: store64(addr, value.reinterpreti64()); break;
         case v128: store128(addr, value.getv128()); break;
-        case none:
-        case unreachable: WASM_UNREACHABLE();
+        case none: WASM_UNREACHABLE();
       }
     }
 

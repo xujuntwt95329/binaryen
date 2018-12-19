@@ -692,7 +692,6 @@ private:
       case f64:
       case v128: ret = _makeConcrete(type); break;
       case none: ret = _makenone(); break;
-      case unreachable: ret = _makeunreachable(); break;
     }
     assert(ret->type == type); // we should create the right type of thing
     nesting--;
@@ -741,24 +740,7 @@ private:
     if (choice < 70) return makeIf(none);
     if (choice < 80) return makeLoop(none);
     if (choice < 90) return makeBreak(none);
-    switch (upTo(11)) {
-      case 0: return makeBlock(none);
-      case 1: return makeIf(none);
-      case 2: return makeLoop(none);
-      case 3: return makeBreak(none);
-      case 4: return makeCall(none);
-      case 5: return makeCallIndirect(none);
-      case 6: return makeSetLocal(none);
-      case 7: return makeStore(none);
-      case 8: return makeDrop(none);
-      case 9: return makeNop(none);
-      case 10: return makeSetGlobal(none);
-    }
-    WASM_UNREACHABLE();
-  }
-
-  Expression* _makeunreachable() {
-    switch (upTo(15)) {
+    switch (upTo(17)) {
       case 0: return makeBlock(unreachable);
       case 1: return makeIf(unreachable);
       case 2: return makeLoop(unreachable);
@@ -773,7 +755,9 @@ private:
       case 11: return makeSwitch(unreachable);
       case 12: return makeDrop(unreachable);
       case 13: return makeReturn(unreachable);
-      case 14: return makeUnreachable(unreachable);
+      case 14: return makeNop(none);
+      case 15: return makeSetGlobal(none);
+      case 16: return makeUnreachable(none);
     }
     WASM_UNREACHABLE();
   }
@@ -1116,8 +1100,7 @@ private:
       case v128: {
         return builder.makeLoad(16, false, offset, pick(1, 2, 4, 8, 16), ptr, type);
       }
-      case none:
-      case unreachable: WASM_UNREACHABLE();
+      case none: WASM_UNREACHABLE();
     }
     WASM_UNREACHABLE();
   }
@@ -1181,8 +1164,7 @@ private:
       case v128: {
         return builder.makeStore(16, offset, pick(1, 2, 4, 8, 16), ptr, value, type);
       }
-      case none:
-      case unreachable: WASM_UNREACHABLE();
+      case none: WASM_UNREACHABLE();
     }
     WASM_UNREACHABLE();
   }
@@ -1233,8 +1215,7 @@ private:
           case f32: return Literal(getFloat());
           case f64: return Literal(getDouble());
           case v128:
-          case none:
-          case unreachable: WASM_UNREACHABLE();
+          case none: WASM_UNREACHABLE();
         }
         break;
       }
@@ -1256,8 +1237,7 @@ private:
           case f32: return Literal(float(small));
           case f64: return Literal(double(small));
           case v128:
-          case none:
-          case unreachable: WASM_UNREACHABLE();
+          case none: WASM_UNREACHABLE();
         }
         break;
       }
@@ -1295,8 +1275,7 @@ private:
                                                  std::numeric_limits<uint32_t>::max(),
                                                  std::numeric_limits<uint64_t>::max())); break;
           case v128:
-          case none:
-          case unreachable: WASM_UNREACHABLE();
+          case none: WASM_UNREACHABLE();
         }
         // tweak around special values
         if (oneIn(3)) { // +- 1
@@ -1316,8 +1295,7 @@ private:
           case f32: value = Literal(float(int64_t(1) << upTo(64))); break;
           case f64: value = Literal(double(int64_t(1) << upTo(64))); break;
           case v128:
-          case none:
-          case unreachable: WASM_UNREACHABLE();
+          case none: WASM_UNREACHABLE();
         }
         // maybe negative
         if (oneIn(2)) {
@@ -1382,8 +1360,7 @@ private:
                                     AnyTrueVecI32x4, AllTrueVecI32x4, AnyTrueVecI64x2, AllTrueVecI64x2),
                                make(v128) });
           }
-          case none:
-          case unreachable: WASM_UNREACHABLE();
+          case none: WASM_UNREACHABLE();
         }
         WASM_UNREACHABLE();
       }
@@ -1451,8 +1428,7 @@ private:
         }
         WASM_UNREACHABLE();
       }
-      case none:
-      case unreachable: WASM_UNREACHABLE();
+      case none: WASM_UNREACHABLE();
     }
     WASM_UNREACHABLE();
   }
@@ -1501,8 +1477,7 @@ private:
                  AddVecF64x2, SubVecF64x2, MulVecF64x2, DivVecF64x2, MinVecF64x2, MaxVecF64x2),
             make(v128), make(v128) });
       }
-      case none:
-      case unreachable: WASM_UNREACHABLE();
+      case none: WASM_UNREACHABLE();
     }
     WASM_UNREACHABLE();
   }
@@ -1559,7 +1534,7 @@ private:
   }
 
   Expression* makeUnreachable(Type type) {
-    assert(type == unreachable);
+    assert(type == none);
     return builder.makeUnreachable();
   }
 
@@ -1639,8 +1614,7 @@ private:
       case f32: op = ExtractLaneVecF32x4; break;
       case f64: op = ExtractLaneVecF64x2; break;
       case v128:
-      case none:
-      case unreachable: WASM_UNREACHABLE();
+      case none: WASM_UNREACHABLE();
     }
     Expression* vec = make(v128);
     uint8_t index = 0;

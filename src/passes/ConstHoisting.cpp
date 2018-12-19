@@ -96,8 +96,7 @@ private:
         // v128 not implemented yet
         return false;
       }
-      case none:
-      case unreachable: {
+      case none: {
         WASM_UNREACHABLE();
       }
     }

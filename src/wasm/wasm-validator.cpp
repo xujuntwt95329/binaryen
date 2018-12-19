@@ -157,8 +157,7 @@ struct ValidationInfo {
   void shouldBeIntOrUnreachable(Type ty, Expression* curr, const char* text, Function* func = nullptr) {
     switch (ty) {
       case i32:
-      case i64:
-      case unreachable: {
+      case i64: {
         break;
       }
       default: fail(text, curr, func);
@@ -644,7 +643,6 @@ void FunctionValidator::validateMemBytes(uint8_t bytes, Type type, Expression* c
     case f64: shouldBeEqual(bytes, uint8_t(8), curr, "expected f64 operation to touch 8 bytes"); break;
     case v128: shouldBeEqual(bytes, uint8_t(16), curr, "expected v128 operation to touch 16 bytes"); break;
     case none: WASM_UNREACHABLE();
-    case unreachable: break;
   }
 }
 
@@ -1115,8 +1113,7 @@ void FunctionValidator::validateAlignment(size_t align, Type type, Index bytes,
       shouldBeTrue(align <= 8, curr, "alignment must not exceed natural");
       break;
     }
-    case v128:
-    case unreachable: break;
+    case v128: break;
     case none: WASM_UNREACHABLE();
   }
 }

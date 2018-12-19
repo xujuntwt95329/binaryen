@@ -1822,7 +1822,7 @@ void WasmBinaryBuilder::visitBlock(Block* curr) {
       throwError("block cannot pop from outside");
     }
     pushBlockElements(curr, start, end);
-    curr->finalize(curr->type, breakTargetNames.find(curr->name) != breakTargetNames.end() /* hasBreak */);
+    curr->finalize(curr->type);
     breakStack.pop_back();
     breakTargetNames.erase(curr->name);
   }

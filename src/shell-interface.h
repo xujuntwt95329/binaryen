@@ -128,8 +128,7 @@ struct ShellExternalInterface : ModuleInstance::ExternalInterface {
           case f32: globals[import->name] = Literal(float(666.6)); break;
           case f64: globals[import->name] = Literal(double(666.6)); break;
           case v128: assert(false && "v128 not implemented yet");
-          case none:
-          case unreachable: WASM_UNREACHABLE();
+          case none: WASM_UNREACHABLE();
         }
       }
     });
