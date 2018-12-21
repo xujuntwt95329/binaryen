@@ -49,7 +49,7 @@ struct SizeAnalyzer : public Visitor<SizeAnalyzer, Index> {
 
   // Get the binary written size of a literal. This is smaller than a Const
   // node, which would also have an opcode for the type.
-  Index getLiteralSize(Literal value) {
+  static Index getLiteralSize(Literal value) {
     switch (value.type) {
       case i32: {
         // TODO: if this is slow, we could just estimate
@@ -70,7 +70,6 @@ struct SizeAnalyzer : public Visitor<SizeAnalyzer, Index> {
     }
   }
 
-private:
   Index visitRecursively(Expression* curr) {
     Index ret = visit(curr);
     // Child nodes simply add to the parent size.

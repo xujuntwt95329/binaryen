@@ -28,7 +28,7 @@ namespace Features {
 
 FeatureSet get(UnaryOp op) {
   FeatureSet ret;
-  switch (curr->op) {
+  switch (op) {
     case TruncSatSFloat32ToInt32:
     case TruncSatUFloat32ToInt32:
     case TruncSatSFloat64ToInt32:
@@ -38,6 +38,7 @@ FeatureSet get(UnaryOp op) {
     case TruncSatSFloat64ToInt64:
     case TruncSatUFloat64ToInt64: {
       ret.setTruncSat();
+      break;
     }
     case SplatVecI8x16:
     case SplatVecI16x8:
@@ -73,15 +74,16 @@ FeatureSet get(UnaryOp op) {
     case ConvertSVecI64x2ToVecF64x2:
     case ConvertUVecI64x2ToVecF64x2: {
       ret.setSIMD();
+      break;
     }
-    case InvalidUnary: WASM_UNREACHABLE();
+    default: {}
   }
   return ret;
 }
 
 FeatureSet get(BinaryOp op) {
   FeatureSet ret;
-  switch (curr->op) {
+  switch (op) {
     case EqVecI8x16:
     case NeVecI8x16:
     case LtSVecI8x16:
@@ -159,8 +161,9 @@ FeatureSet get(BinaryOp op) {
     case MinVecF64x2:
     case MaxVecF64x2: {
       ret.setSIMD();
+      break;
     }
-    case InvalidBinary: WASM_UNREACHABLE();
+    default: {}
   }
   return ret;
 }

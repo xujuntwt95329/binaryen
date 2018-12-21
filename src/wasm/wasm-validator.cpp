@@ -823,6 +823,8 @@ void FunctionValidator::visitBinary(Binary* curr) {
     }
     case InvalidBinary: WASM_UNREACHABLE();
   }
+  // All used features should be allowed.
+  shouldBeTrue(Features::get(curr->op) <= info.features);
 }
 
 void FunctionValidator::visitUnary(Unary* curr) {
@@ -897,7 +899,6 @@ void FunctionValidator::visitUnary(Unary* curr) {
     case TruncSatSFloat32ToInt64:
     case TruncSatUFloat32ToInt32:
     case TruncSatUFloat32ToInt64: {
-      shouldBeTrue(info.features.hasTruncSat(), curr, "nontrapping float-to-int conversions are disabled");
       shouldBeEqual(curr->value->type, f32, curr, "trunc type must be correct");
       break;
     }
@@ -912,7 +913,6 @@ void FunctionValidator::visitUnary(Unary* curr) {
     case TruncSatSFloat64ToInt64:
     case TruncSatUFloat64ToInt32:
     case TruncSatUFloat64ToInt64: {
-      shouldBeTrue(info.features.hasTruncSat(), curr, "nontrapping float-to-int conversions are disabled");
       shouldBeEqual(curr->value->type, f64, curr, "trunc type must be correct");
       break;
     }
@@ -1007,6 +1007,8 @@ void FunctionValidator::visitUnary(Unary* curr) {
       break;
     case InvalidUnary: WASM_UNREACHABLE();
   }
+  // All used features should be allowed.
+  shouldBeTrue(Features::get(curr->op) <= info.features);
 }
 
 void FunctionValidator::visitSelect(Select* curr) {
