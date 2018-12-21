@@ -26,7 +26,7 @@ namespace wasm {
 
 namespace Features {
 
-FeatureSet get(UnaryOp op) {
+inline FeatureSet get(UnaryOp op) {
   FeatureSet ret;
   switch (op) {
     case TruncSatSFloat32ToInt32:
@@ -81,7 +81,7 @@ FeatureSet get(UnaryOp op) {
   return ret;
 }
 
-FeatureSet get(BinaryOp op) {
+inline FeatureSet get(BinaryOp op) {
   FeatureSet ret;
   switch (op) {
     case EqVecI8x16:

@@ -63,8 +63,7 @@ struct SizeAnalyzer : public Visitor<SizeAnalyzer, Index> {
       case v128: {
         return getTypeSize(value.type);
       }
-      case none:
-      case unreachable: {
+      default: {
         WASM_UNREACHABLE();
       }
     }
