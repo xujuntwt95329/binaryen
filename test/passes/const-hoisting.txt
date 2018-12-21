@@ -1,5 +1,6 @@
 (module
  (type $0 (func))
+ (type $1 (func (result v128)))
  (func $10-of-each (; 0 ;) (type $0)
   (local $0 i32)
   (local $1 i32)
@@ -624,6 +625,23 @@
    (drop
     (get_local $0)
    )
+  )
+ )
+ (func $simd (; 10 ;) (type $1) (result v128)
+  (local $0 v128)
+  (block
+   (set_local $0
+    (v128.const i32 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0)
+   )
+  )
+  (block (result v128)
+   (if
+    (i32.const 0)
+    (return
+     (get_local $0)
+    )
+   )
+   (get_local $0)
   )
  )
 )
