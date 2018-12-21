@@ -34,8 +34,8 @@
 
 #include <wasm.h>
 #include <pass.h>
-#include <wasm-binary.h>
 #include <wasm-builder.h>
+#include <ir/size.h>
 
 namespace wasm {
 
@@ -77,30 +77,7 @@ private:
   bool worthHoisting(Literal value, Index num) {
     if (num < MIN_USES) return false;
     // measure the size of the constant
-    Index size = 0;
-    switch (value.type) {
-      case i32: {
-        size = getWrittenSize(S32LEB(value.geti32()));
-        break;
-      }
-      case i64: {
-        size = getWrittenSize(S64LEB(value.geti64()));
-        break;
-      }
-      case f32:
-      case f64: {
-        size = getTypeSize(value.type);
-        break;
-      }
-      case v128: {
-        // v128 not implemented yet
-        return false;
-      }
-      case none:
-      case unreachable: {
-        WASM_UNREACHABLE();
-      }
-    }
+    Index size = SizeAnalyzer::getLiteralSize(value);
     // compute the benefit, of replacing the uses with
     // one use + a set and then a get for each use
     // doing the algebra, the criterion here is when
@@ -110,13 +87,6 @@ private:
     auto before = num * size;
     auto after = size + 2 /* set_local */ + (2 /* get_local */ * num);
     return after < before;
-  }
-
-  template<typename T>
-  Index getWrittenSize(const T& thing) {
-    BufferWithRandomAccess buffer;
-    buffer << thing;
-    return buffer.size();
   }
 
   // replace all the uses with gets, for a local set at the top. returns

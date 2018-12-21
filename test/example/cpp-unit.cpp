@@ -7,11 +7,19 @@
 
 using namespace wasm;
 
-int main() 
-{
+void testCost() {
   // Some optimizations assume that the cost of a get is zero, e.g. local-cse.
   GetLocal get;
   assert(CostAnalyzer(&get).cost == 0);
+}
+
+void testSize() {
+}
+
+int main() 
+{
+  testCost();
+  testSize();
 
   std::cout << "Success.\n";
   return 0;
