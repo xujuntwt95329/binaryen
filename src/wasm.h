@@ -68,7 +68,7 @@ struct FeatureSet {
   void setAll(bool v = true) { features = v ? All : MVP; }
 
   bool operator<=(const FeatureSet& other) {
-    return features & ~other.features;
+    return !(features & ~other.features);
   }
 
 private:
