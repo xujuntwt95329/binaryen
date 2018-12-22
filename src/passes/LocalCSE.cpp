@@ -94,6 +94,10 @@ struct LocalCSE : public WalkerPass<LinearExecutionWalker<LocalCSE>> {
     //  >=
     // size + 2*get + set (a set of it, and 2 gets)
     // x >= 2g + s
+    // XXX this is not right:
+    //  * one opt here may enable another
+    //  * this is on flat IR, and we don't see nested full expressions
+    //  * etc
     SetLocal set;
     GetLocal get;
     sizeWorthConsidering = 2 * SizeAnalyzer::getSelfSize(&get) +
