@@ -89,19 +89,21 @@ struct LocalCSE : public WalkerPass<LinearExecutionWalker<LocalCSE>> {
   }
 
   void calculateSizeWorthConsidering() {
-    // We are looking for a size such that
-    // 2*size (2 appearances of it)
-    //  >=
-    // size + 2*get + set (a set of it, and 2 gets)
-    // x >= 2g + s
-    // XXX this is not right:
-    //  * one opt here may enable another
-    //  * this is on flat IR, and we don't see nested full expressions
-    //  * etc
+    // We start with 2 (or more) uses of X, and transform that into
+    // a set of X and two gets. We can assume that later optimizations
+    // will emit a tee for the first, so we are adding one set and one
+    // get, in return for removing one copy of X. That is, we are looking
+    // for a size such that
+    //  |X| + |get| + |set| <= 2 * |X|
+    // FIXME: this is overly pessimistic, as in flat mode we see nested
+    //        subexpressions as gets, so e.g. (eqz (something)) would seem
+    //        to be of size 3, but might be larger. As a result, we do not
+    //        optimize unary expressions here (binaries would already
+    //        be guaranteed to be good enough).
     SetLocal set;
     GetLocal get;
-    sizeWorthConsidering = 2 * SizeAnalyzer::getSelfSize(&get) +
-                               SizeAnalyzer::getSelfSize(&set);
+    sizeWorthConsidering = SizeAnalyzer::getSelfSize(&get) +
+                           SizeAnalyzer::getSelfSize(&set);
   }
 
   static void doNoteNonLinear(LocalCSE* self, Expression** currp) {
