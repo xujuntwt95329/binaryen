@@ -25,7 +25,7 @@ namespace wasm {
 // Measure the execution cost of an AST. Very handwave-ey
 
 struct CostAnalyzer : public Visitor<CostAnalyzer, Index> {
-  CostAnalyzer(Expression *ast) {
+  CostAnalyzer(Expression* ast) {
     cost = visit(ast);
   }
 

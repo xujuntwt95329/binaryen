@@ -33,8 +33,20 @@ namespace wasm {
 // (which is possible in stacky code).
 
 struct SizeAnalyzer : public Visitor<SizeAnalyzer, Index> {
-  SizeAnalyzer(Expression *ast) {
+  SizeAnalyzer() : size(0) {}
+
+  SizeAnalyzer(Expression* ast) {
     size = visitRecursively(ast);
+  }
+
+  // Get the size including children.
+  static Index getSize(Expression* ast) {
+    return SizeAnalyzer(ast).size;
+  }
+
+  // Get the size ignoring children.
+  static Index getSelfSize(Expression* curr) {
+    return SizeAnalyzer().visit(curr);
   }
 
   Index size;

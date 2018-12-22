@@ -45,6 +45,7 @@
 #include <ir/cost.h>
 #include <ir/equivalent_sets.h>
 #include <ir/hashed.h>
+#include <ir/size.h>
 
 namespace wasm {
 
@@ -74,7 +75,10 @@ struct LocalCSE : public WalkerPass<LinearExecutionWalker<LocalCSE>> {
 
   bool anotherPass;
 
+  Index sizeWorthConsidering;
+
   void doWalkFunction(Function* func) {
+    calculateSizeWorthConsidering();
     anotherPass = true;
     // we may need multiple rounds
     while (anotherPass) {
@@ -82,6 +86,18 @@ struct LocalCSE : public WalkerPass<LinearExecutionWalker<LocalCSE>> {
       clear();
       super::doWalkFunction(func);
     }
+  }
+
+  void calculateSizeWorthConsidering() {
+    // We are looking for a size such that
+    // 2*size (2 appearances of it)
+    //  >=
+    // size + 2*get + set (a set of it, and 2 gets)
+    // x >= 2g + s
+    SetLocal set;
+    GetLocal get;
+    sizeWorthConsidering = 2 * SizeAnalyzer::getSelfSize(&get) +
+                               SizeAnalyzer::getSelfSize(&set);
   }
 
   static void doNoteNonLinear(LocalCSE* self, Expression** currp) {
@@ -210,10 +226,7 @@ struct LocalCSE : public WalkerPass<LinearExecutionWalker<LocalCSE>> {
       return false; // we can't combine things with side effects
     }
     auto& options = getPassRunner()->options;
-    // If the size is at least 3, then if we have two of them we have 6,
-    // and so adding one set+two gets and removing one of the items itself
-    // is not detrimental, and may be beneficial.
-    if (options.shrinkLevel > 0 && Measurer::measure(value) >= 3) {
+    if (options.shrinkLevel > 0 && SizeAnalyzer::getSize(value) >= sizeWorthConsidering) {
       return true;
     }
     // If we focus on speed, any reduction in cost is beneficial, as the
