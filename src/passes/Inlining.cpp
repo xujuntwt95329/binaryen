@@ -37,30 +37,22 @@
 #include "wasm-builder.h"
 #include "ir/literal-utils.h"
 #include "ir/module-utils.h"
-#include "ir/utils.h"
+#include "ir/size.h"
 #include "parsing.h"
 #include "passes/opt-utils.h"
 
 namespace wasm {
 
 // A limit on how big a function to inline when being careful about size
-static const int CAREFUL_SIZE_LIMIT = 15;
+static const int CAREFUL_SIZE_LIMIT = 40;
 
 // A limit on how big a function to inline when being more flexible. In
 // particular it's nice that with this limit we can inline the clamp
 // functions (i32s-div, f64-to-int, etc.), that can affect perf.
-static const int FLEXIBLE_SIZE_LIMIT = 20;
+static const int FLEXIBLE_SIZE_LIMIT = 75;
 
-// A size so small that after optimizations, the inlined code will be
-// smaller than the call instruction itself. 2 is a safe number because
-// there is no risk of things like
-//  (func $reverse (param $x i32) (param $y i32)
-//   (call $something (get_local $y) (get_local $x))
-//  )
-// in which case the reversing of the params means we'll possibly need
-// a block and a temp local. But that takes at least 3 nodes, and 2 < 3.
-// More generally, with 2 items we may have a get_local, but no way to
-// require it to be saved instead of directly consumed.
+// A size so small that after optimizations, the inlined code will
+// likely be smaller than the call instruction itself.
 static const int INLINING_OPTIMIZING_WILL_DECREASE_SIZE_LIMIT = 2;
 
 // Useful into on a function, helping us decide if we can inline it
@@ -119,7 +111,7 @@ struct FunctionInfoScanner : public WalkerPass<PostWalker<FunctionInfoScanner>> 
   }
 
   void visitFunction(Function* curr) {
-    (*infos)[curr->name].size = Measurer::measure(curr->body);
+    (*infos)[curr->name].size = SizeAnalyzer::getSize(curr->body);
   }
 
 private:
