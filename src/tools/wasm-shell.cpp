@@ -23,7 +23,7 @@
 #include <memory>
 
 #include "execution-results.h"
-#include "feature-options.h"
+#include "options.h"
 #include "pass.h"
 #include "shell-interface.h"
 #include "support/file.h"
@@ -233,7 +233,7 @@ int main(int argc, const char* argv[]) {
   Name entry;
   std::set<size_t> skipped;
 
-  FeatureOptions options("wasm-shell", "Execute .wast files");
+  ToolOptions options("wasm-shell", "Execute .wast files");
   options
       .add(
           "--entry", "-e", "Call the entry point after parsing the module",

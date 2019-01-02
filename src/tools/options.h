@@ -15,20 +15,29 @@
  */
 
 #include "support/command-line.h"
+#include "support/path.h"
 #include "pass.h"
 
 //
-// Shared optimization options for commandline tools
+// Shared options for commandline tools
 //
 
 namespace wasm {
 
-struct FeatureOptions : public Options {
+struct ToolOptions : public Options {
   PassOptions passOptions;
 
-  FeatureOptions(const std::string& command, const std::string& description)
+  ToolOptions(const std::string& command, const std::string& description)
       : Options(command, description) {
     (*this)
+        // Settings
+        .add("--binaries", "-b", "binaryen binaries location (bin/ directory)",
+             Options::Arguments::One,
+             [&](Options* o, const std::string& argument) {
+               // Add separator just in case
+               Path::setBinaryenBinDir(argument + Path::getPathSeparator());
+             })
+        // Features
         .add("--mvp-features", "-mvp", "Disable all non-MVP features",
              Options::Arguments::Zero,
              [this](Options *o, const std::string& arguments) {

@@ -40,6 +40,7 @@
 #include "ir/literal-utils.h"
 #include "ir/properties.h"
 #include "wasm-validator.h"
+#include "options.h"
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -868,7 +869,7 @@ int main(int argc, const char* argv[]) {
        verbose = false,
        debugInfo = false,
        force = false;
-  Options options("wasm-reduce", "Reduce a wasm file to a smaller one that has the same behavior on a given command");
+  ToolOptions options("wasm-reduce", "Reduce a wasm file to a smaller one that has the same behavior on a given command");
   options
       .add("--command", "-cmd", "The command to run on the test, that we want to reduce while keeping the command's output identical. "
                                 "We look at the command's return code and stdout here (TODO: stderr), "
@@ -887,12 +888,6 @@ int main(int argc, const char* argv[]) {
            Options::Arguments::One,
            [&](Options* o, const std::string& argument) {
              working = argument;
-           })
-      .add("--binaries", "-b", "binaryen binaries location (bin/ directory)",
-           Options::Arguments::One,
-           [&](Options* o, const std::string& argument) {
-             // Add separator just in case
-             Path::setBinaryenBinDir(argument + Path::getPathSeparator());
            })
       .add("--text", "-S", "Emit intermediate files as text, instead of binary (also make sure the test and working files have a .wat or .wast suffix)",
            Options::Arguments::Zero,
