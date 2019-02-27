@@ -74,6 +74,8 @@ using namespace wasm;
 // a timeout on every execution of the command
 size_t timeout = 2;
 
+bool force = false;
+
 struct ProgramResult {
   int code;
   std::string output;
@@ -310,6 +312,7 @@ struct Reducer : public WalkerPass<PostWalker<Reducer, UnifiedExpressionVisitor<
     ProgramResult result;
     if (!writeAndTestReduction(result)) {
       std::cerr << "\n|! WARNING: writing before destructive reduction fails, very unlikely reduction can work\n" << result << '\n';
+      if (!force) exit(1);
     }
     // destroy!
     walkModule(getModule());
@@ -885,8 +888,7 @@ int main(int argc, const char* argv[]) {
   bool binary = true,
        deNan = false,
        verbose = false,
-       debugInfo = false,
-       force = false;
+       debugInfo = false;
   Options options("wasm-reduce", "Reduce a wasm file to a smaller one that has the same behavior on a given command");
   options
       .add("--command", "-cmd", "The command to run on the test, that we want to reduce while keeping the command's output identical. "
