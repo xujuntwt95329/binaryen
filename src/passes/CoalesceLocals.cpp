@@ -20,6 +20,12 @@
 // is similar to register allocation, however, there is never any
 // spilling, and there isn't a fixed number of locals.
 //
+// This is not done on SSA form - in most cases the previous compiler did
+// that already compiler did that, and by not running on SSA we have a
+// guarantee of only refining the result, that is, we never add any locals,
+// and only remove copies (returning to SSA form would introduce a risk of
+// copy inefficiency; still, we should consider this as an option).
+//
 
 
 #include <algorithm>
@@ -28,6 +34,7 @@
 
 #include "wasm.h"
 #include "pass.h"
+#include <ir/parents.h>
 #include "ir/utils.h"
 #include "cfg/liveness-traversal.h"
 #include "wasm-builder.h"
@@ -73,6 +80,10 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
   void interfereLowHigh(Index low, Index high) { // optimized version where you know that low < high
     assert(low < high);
     interferences[low * numLocals + high] = 1;
+  }
+
+  void unInterfere(Index i, Index j) {
+    interferences[std::min(i, j) * numLocals + std::max(i, j)] = 0;
   }
 
   bool interferes(Index i, Index j) {
@@ -149,6 +160,78 @@ void CoalesceLocals::calculateInterferences() {
     start.insert(i);
   }
   calculateInterferences(start);
+  // Remove trivially irrelevant interferences. SSA analysis could help here (but see comments
+  // earlier), but for now just look at the easy case of two locals that always copy each
+  // other, and break that cycle.
+  const Index invalid = -1;
+  std::map<Index, Index> copied;
+  for (auto& curr : basicBlocks) {
+    if (liveBlocks.count(curr.get()) == 0) continue; // ignore dead blocks
+    for (auto& action : curr->contents.actions) {
+      if (action.isSet()) {
+        auto* value = (*action.origin)->cast<SetLocal>()->value;
+        Index copiedIndex = invalid;
+        if (auto* get = value->dynCast<GetLocal>()) {
+          copiedIndex = get->index;
+        } else if (auto* set = value->dynCast<SetLocal>()) {
+          copiedIndex = set->index;
+        }
+        auto iter = copied.find(action.index);
+        if (iter == copied.end()) {
+          copied[action.index] = copiedIndex;
+        } else if (iter->second != copiedIndex) {
+          copied[action.index] = invalid;
+        }
+      }
+    }
+  }
+  std::unique_ptr<Parents> parents;
+
+  for (auto& pair : copied) {
+    auto dst = pair.first;
+    auto src = pair.second;
+    // Check if we only ever assign a copy to the destination. They must both be
+    // vars, as well - so that they begin equal as zeros.
+    if (src != invalid &&
+        getFunction()->isVar(src) && getFunction()->isVar(dst)) {
+      // Ok, we know the destination is always assigned the source. Check if the
+      // source can be modified anywhere else.
+      bool valid = true;
+      for (auto& curr : basicBlocks) {
+        if (liveBlocks.count(curr.get()) == 0) continue; // ignore dead blocks
+        for (auto& action : curr->contents.actions) {
+          if (action.isSet() && action.index == src) {
+            // This is a set of the source. See that it is immediately assigned to
+            // the destination, perhaps through some other tees.
+            auto* set = (*action.origin)->cast<SetLocal>();
+            if (!parents) {
+              parents = make_unique<Parents>(getFunction()->body);
+            }
+            while (true) {
+              auto* parent = parents->getParent(set);
+              if (!parent) {
+                valid = false;
+                break;
+              }
+              set = parent->dynCast<SetLocal>();
+              if (!set) {
+                valid = false;
+                break;
+              }
+              if (set->index == dst) {
+                break;
+              }
+            }
+            if (!valid) break;
+          }
+        }
+        if (!valid) break;
+      }
+      if (valid) {
+        unInterfere(dst, src);
+      }
+    }
+  }
 }
 
 void CoalesceLocals::calculateInterferences(const LocalSet& locals) {

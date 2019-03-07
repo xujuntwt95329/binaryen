@@ -3,8 +3,8 @@ total
  [imports]      : 3       
  [memory-data]  : 28      
  [table-data]   : 429     
- [total]        : 132     
- [vars]         : 4       
+ [total]        : 131     
+ [vars]         : 3       
  binary         : 12      
  block          : 8       
  break          : 3       
@@ -17,7 +17,7 @@ total
  if             : 3       
  load           : 16      
  local.get      : 18      
- local.set      : 7       
+ local.set      : 6       
  loop           : 1       
  store          : 5       
 (module
@@ -152,26 +152,23 @@ total
  )
  (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 6 ;) (; has Stack IR ;)
   (local $0 i32)
-  (local $1 i32)
   (block $label$1
    (br_if $label$1
     (if (result i32)
      (i32.load
       (i32.add
-       (local.tee $1
-        (local.tee $0
-         (i32.load
-          (i32.add
-           (i32.load
-            (i32.add
-             (i32.load
-              (i32.const 18100)
-             )
-             (i32.const -12)
+       (local.tee $0
+        (i32.load
+         (i32.add
+          (i32.load
+           (i32.add
+            (i32.load
+             (i32.const 18100)
             )
+            (i32.const -12)
            )
-           (i32.const 18124)
           )
+          (i32.const 18124)
          )
         )
        )
@@ -180,7 +177,7 @@ total
      )
      (i32.const 0)
      (call_indirect (type $0)
-      (local.get $1)
+      (local.get $0)
       (i32.const 10)
       (i32.add
        (i32.load offset=52
@@ -244,8 +241,8 @@ total
  [imports]      : 3       
  [memory-data]  : 28      
  [table-data]   : 429     
- [total]        : 132     
- [vars]         : 4       
+ [total]        : 131     
+ [vars]         : 3       
  binary         : 12      
  block          : 8       
  break          : 3       
@@ -258,7 +255,7 @@ total
  if             : 3       
  load           : 16      
  local.get      : 18      
- local.set      : 7       
+ local.set      : 6       
  loop           : 1       
  store          : 5       
 (module
@@ -394,26 +391,23 @@ total
  )
  (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 6 ;) (; has Stack IR ;) (type $FUNCSIG$v)
   (local $0 i32)
-  (local $1 i32)
   (block $label$1
    (br_if $label$1
     (if (result i32)
      (i32.load
       (i32.add
-       (local.tee $1
-        (local.tee $0
-         (i32.load
-          (i32.add
-           (i32.load
-            (i32.add
-             (i32.load
-              (i32.const 18100)
-             )
-             (i32.const -12)
+       (local.tee $0
+        (i32.load
+         (i32.add
+          (i32.load
+           (i32.add
+            (i32.load
+             (i32.const 18100)
             )
+            (i32.const -12)
            )
-           (i32.const 18124)
           )
+          (i32.const 18124)
          )
         )
        )
@@ -422,7 +416,7 @@ total
      )
      (i32.const 0)
      (call_indirect (type $0)
-      (local.get $1)
+      (local.get $0)
       (i32.const 10)
       (i32.add
        (i32.load offset=52
@@ -486,8 +480,8 @@ total
  [imports]      : 3       
  [memory-data]  : 28      
  [table-data]   : 429     
- [total]        : 132     
- [vars]         : 4       
+ [total]        : 131     
+ [vars]         : 3       
  binary         : 12      
  block          : 8       
  break          : 3       
@@ -500,7 +494,7 @@ total
  if             : 3       
  load           : 16      
  local.get      : 18      
- local.set      : 7       
+ local.set      : 6       
  loop           : 1       
  store          : 5       
 (module
@@ -636,26 +630,23 @@ total
  )
  (func $__ZNSt3__213basic_ostreamIcNS_11char_traitsIcEEE3putEc (; 6 ;) (; has Stack IR ;) (type $FUNCSIG$v)
   (local $0 i32)
-  (local $1 i32)
   (block $label$1
    (br_if $label$1
     (if (result i32)
      (i32.load
       (i32.add
-       (local.tee $1
-        (local.tee $0
-         (i32.load
-          (i32.add
-           (i32.load
-            (i32.add
-             (i32.load
-              (i32.const 18100)
-             )
-             (i32.const -12)
+       (local.tee $0
+        (i32.load
+         (i32.add
+          (i32.load
+           (i32.add
+            (i32.load
+             (i32.const 18100)
             )
+            (i32.const -12)
            )
-           (i32.const 18124)
           )
+          (i32.const 18124)
          )
         )
        )
@@ -664,7 +655,7 @@ total
      )
      (i32.const 0)
      (call_indirect (type $0)
-      (local.get $1)
+      (local.get $0)
       (i32.const 10)
       (i32.add
        (i32.load offset=52
