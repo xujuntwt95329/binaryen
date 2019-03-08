@@ -109,9 +109,10 @@ void CoalesceLocals::increaseBackEdgePriorities() {
       for (auto& action : arrivingBlock->contents.actions) {
         if (action.isSet()) {
           auto* set = (*action.origin)->cast<SetLocal>();
-          if (auto* get = getCopy(set)) {
+          auto copiedIndex = getCopiedIndex(set->value);
+          if (copiedIndex != InvalidIndex) {
             // this is indeed a copy, add to the cost (default cost is 2, so this adds 50%, and can mostly break ties)
-            addCopy(set->index, get->index);
+            addCopy(set->index, copiedIndex);
           }
         }
       }

@@ -128,10 +128,11 @@ struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
     }
     self->currBasicBlock->contents.actions.emplace_back(LivenessAction::Set, curr->index, currp);
     // if this is a copy, note it
-    if (auto* get = self->getCopy(curr)) {
+    auto copiedIndex = self->getCopiedIndex(curr->value);
+    if (copiedIndex != InvalidIndex) {
       // add 2 units, so that backedge prioritization can decide ties, but not much more
-      self->addCopy(curr->index, get->index);
-      self->addCopy(curr->index, get->index);
+      self->addCopy(curr->index, copiedIndex);
+      self->addCopy(curr->index, copiedIndex);
     }
   }
 
@@ -141,16 +142,23 @@ struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
   // nested ifs, and block return values? Those cases are trickier, need to
   // count to see if worth it.
   // TODO: an if can have two copies
-  GetLocal* getCopy(SetLocal* set) {
-    if (auto* get = set->value->dynCast<GetLocal>()) return get;
-    if (auto* iff = set->value->dynCast<If>()) {
-      if (auto* get = iff->ifTrue->dynCast<GetLocal>()) return get;
+  Index getCopiedIndex(Expression* value) {
+    if (auto* get = value->dynCast<GetLocal>()) {
+      return get->index;
+    } else if (auto* set = value->dynCast<SetLocal>()) {
+      return set->index;
+    } else if (auto* iff = value->dynCast<If>()) {
+      auto ret = getCopiedIndex(iff->ifTrue);
+      if (ret != InvalidIndex) return ret;
       if (iff->ifFalse) {
-        if (auto* get = iff->ifFalse->dynCast<GetLocal>()) return get;
+        auto ret = getCopiedIndex(iff->ifFalse);
+        if (ret != InvalidIndex) return ret;
       }
     }
-    return nullptr;
+    return InvalidIndex;
   }
+
+  static const Index InvalidIndex = -1;
 
   // main entry point
 
