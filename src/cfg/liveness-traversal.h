@@ -136,22 +136,21 @@ struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
     }
   }
 
-  // A simple copy is a set of a get. A more interesting copy
-  // is a set of an if with a value, where one side a get.
-  // That can happen when we create an if value in simplify-locals. TODO: recurse into
-  // nested ifs, and block return values? Those cases are trickier, need to
-  // count to see if worth it.
-  // TODO: an if can have two copies
+  // A simple copy is a set of a get, or of a tee. A more interesting copy
+  // is a set of an if with a value, where one side a get. That can happen
+  // when we create an if value in simplify-locals.
+  // We just consider the first copy we find - there may be more than one.
+  // TODO: recurse into block return values?
   Index getCopiedIndex(Expression* value) {
     if (auto* get = value->dynCast<GetLocal>()) {
       return get->index;
     } else if (auto* set = value->dynCast<SetLocal>()) {
       return set->index;
     } else if (auto* iff = value->dynCast<If>()) {
-      auto ret = getCopiedIndex(iff->ifTrue);
-      if (ret != InvalidIndex) return ret;
-      if (iff->ifFalse) {
-        auto ret = getCopiedIndex(iff->ifFalse);
+      if (isConcreteType(iff->type)) {
+        auto ret = getCopiedIndex(iff->ifTrue);
+        if (ret != InvalidIndex) return ret;
+        ret = getCopiedIndex(iff->ifFalse);
         if (ret != InvalidIndex) return ret;
       }
     }
