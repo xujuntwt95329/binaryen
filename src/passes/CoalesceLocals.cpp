@@ -39,6 +39,29 @@
 
 namespace wasm {
 
+static const Index InvalidIndex = -1;
+
+// A simple copy is a set of a get, or of a tee. A more interesting copy
+// is a set of an if with a value, where one side a get. That can happen
+// when we create an if value in simplify-locals.
+// We just consider the first copy we find - there may be more than one.
+// TODO: recurse into block return values?
+static Index getCopiedIndex(Expression* value) {
+  if (auto* get = value->dynCast<GetLocal>()) {
+    return get->index;
+  } else if (auto* set = value->dynCast<SetLocal>()) {
+    return set->index;
+  } else if (auto* iff = value->dynCast<If>()) {
+    if (isConcreteType(iff->type)) {
+      auto ret = getCopiedIndex(iff->ifTrue);
+      if (ret != InvalidIndex) return ret;
+      ret = getCopiedIndex(iff->ifFalse);
+      if (ret != InvalidIndex) return ret;
+     }
+   }
+  return InvalidIndex;
+}
+
 struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor<CoalesceLocals>>> {
   bool isFunctionParallel() override { return true; }
 
@@ -48,7 +71,7 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
 
   void doWalkFunction(Function* func);
 
-  void increaseBackEdgePriorities();
+  void adjustPriorities();
 
   void calculateInterferences();
 
@@ -86,10 +109,10 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
 
 void CoalesceLocals::doWalkFunction(Function* func) {
   super::doWalkFunction(func);
-  // prioritize back edges
-  increaseBackEdgePriorities();
   // use liveness to find interference
   calculateInterferences();
+  // prioritize things like copies
+  adjustPriorities();
   // pick new indices
   std::vector<Index> indices;
   pickIndices(indices);
@@ -97,9 +120,24 @@ void CoalesceLocals::doWalkFunction(Function* func) {
   applyIndices(indices, func->body);
 }
 
-// A copy on a backedge can be especially costly, forcing us to branch just to do that copy.
-// Add weight to such copies, so we prioritize getting rid of them.
-void CoalesceLocals::increaseBackEdgePriorities() {
+void CoalesceLocals::adjustPriorities() {
+  // Note copies.
+  for (auto& curr : basicBlocks) {
+    if (liveBlocks.count(curr.get()) == 0) continue; // ignore dead blocks
+    for (auto& action : curr->contents.actions) {
+      if (action.isSet() && action.effective) {
+        auto* set = (*action.origin)->cast<SetLocal>();
+        auto copiedIndex = getCopiedIndex(set->value);
+        if (copiedIndex != InvalidIndex) {
+          // add 2 units, so that backedge prioritization can decide ties, but not much more
+          addCopy(set->index, copiedIndex);
+          addCopy(set->index, copiedIndex);
+        }
+      }
+    }
+  }
+  // A copy on a backedge can be especially costly, forcing us to branch just to do that copy.
+  // Add weight to such copies, so we prioritize getting rid of them.
   for (auto* loopTop : loopTops) {
     // ignore the first edge, it is the initial entry, we just want backedges
     auto& in = loopTop->in;

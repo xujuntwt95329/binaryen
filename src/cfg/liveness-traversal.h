@@ -127,37 +127,7 @@ struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
       return;
     }
     self->currBasicBlock->contents.actions.emplace_back(LivenessAction::Set, curr->index, currp);
-    // if this is a copy, note it
-    auto copiedIndex = self->getCopiedIndex(curr->value);
-    if (copiedIndex != InvalidIndex) {
-      // add 2 units, so that backedge prioritization can decide ties, but not much more
-      self->addCopy(curr->index, copiedIndex);
-      self->addCopy(curr->index, copiedIndex);
-    }
   }
-
-  // A simple copy is a set of a get, or of a tee. A more interesting copy
-  // is a set of an if with a value, where one side a get. That can happen
-  // when we create an if value in simplify-locals.
-  // We just consider the first copy we find - there may be more than one.
-  // TODO: recurse into block return values?
-  Index getCopiedIndex(Expression* value) {
-    if (auto* get = value->dynCast<GetLocal>()) {
-      return get->index;
-    } else if (auto* set = value->dynCast<SetLocal>()) {
-      return set->index;
-    } else if (auto* iff = value->dynCast<If>()) {
-      if (isConcreteType(iff->type)) {
-        auto ret = getCopiedIndex(iff->ifTrue);
-        if (ret != InvalidIndex) return ret;
-        ret = getCopiedIndex(iff->ifFalse);
-        if (ret != InvalidIndex) return ret;
-      }
-    }
-    return InvalidIndex;
-  }
-
-  static const Index InvalidIndex = -1;
 
   // main entry point
 

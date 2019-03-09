@@ -1234,16 +1234,16 @@
   )
  )
  (func $proper-type (; 56 ;) (type $10) (result f64)
-  (local $0 f64)
-  (local $1 i32)
+  (local $0 i32)
+  (local $1 f64)
   (drop
    (select
     (i32.const 0)
     (i32.const 1)
-    (local.get $1)
+    (local.get $0)
    )
   )
-  (local.get $0)
+  (local.get $1)
  )
  (func $reuse-param (; 57 ;) (type $FUNCSIG$iii) (param $0 i32) (param $1 i32) (result i32)
   (i32.add

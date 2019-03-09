@@ -7674,7 +7674,7 @@
   (local.set $3
    (i32.const 2)
   )
-  (local.set $4
+  (local.set $5
    (i32.add
     (local.get $2)
     (local.get $6)
@@ -7684,8 +7684,8 @@
    (block $while-out
     (if
      (i32.eq
-      (local.get $4)
-      (local.tee $5
+      (local.get $5)
+      (local.tee $4
        (if (result i32)
         (i32.load
          (i32.const 1160)
@@ -7756,7 +7756,7 @@
     )
     (if
      (i32.lt_s
-      (local.get $5)
+      (local.get $4)
       (i32.const 0)
      )
      (block
@@ -7774,14 +7774,14 @@
     )
     (local.set $6
      (i32.sub
-      (local.get $4)
       (local.get $5)
+      (local.get $4)
      )
     )
     (if
      (i32.gt_u
-      (local.get $5)
-      (local.tee $4
+      (local.get $4)
+      (local.tee $5
        (i32.load offset=4
         (local.get $1)
        )
@@ -7805,10 +7805,10 @@
         (local.get $1)
        )
       )
-      (local.set $5
+      (local.set $4
        (i32.sub
-        (local.get $5)
         (local.get $4)
+        (local.get $5)
        )
       )
       (local.set $1
@@ -7834,7 +7834,7 @@
         (i32.store offset=28
          (local.get $0)
          (i32.add
-          (local.get $5)
+          (local.get $4)
           (i32.load offset=28
            (local.get $0)
           )
@@ -7846,14 +7846,14 @@
        )
       )
       (local.set $9
-       (local.get $4)
+       (local.get $5)
       )
      )
     )
     (i32.store
      (local.get $1)
      (i32.add
-      (local.get $5)
+      (local.get $4)
       (i32.load
        (local.get $1)
       )
@@ -7863,10 +7863,10 @@
      (local.get $1)
      (i32.sub
       (local.get $9)
-      (local.get $5)
+      (local.get $4)
      )
     )
-    (local.set $4
+    (local.set $5
      (local.get $6)
     )
     (br $while-in)
@@ -7882,7 +7882,7 @@
      (i32.store offset=16
       (local.get $0)
       (i32.add
-       (local.tee $4
+       (local.tee $5
         (i32.load offset=44
          (local.get $12)
         )
@@ -7894,11 +7894,11 @@
      )
      (i32.store offset=28
       (local.get $0)
-      (local.get $4)
+      (local.get $5)
      )
      (i32.store offset=20
       (local.get $0)
-      (local.get $4)
+      (local.get $5)
      )
      (local.get $2)
     )
