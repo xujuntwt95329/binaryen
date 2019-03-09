@@ -8886,21 +8886,21 @@
      (i32.add
       (select
        (i32.div_u
-        (local.tee $1
+        (local.tee $3
          (call $Wa
-          (local.tee $3
-           (local.tee $2
+          (local.tee $2
+           (local.tee $1
             (call $Za)
            )
           )
           (local.get $0)
          )
         )
-        (local.get $2)
+        (local.get $1)
        )
        (i32.const 1)
        (i32.ne
-        (local.get $1)
+        (local.get $2)
         (local.get $3)
        )
       )
