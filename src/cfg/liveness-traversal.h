@@ -127,29 +127,6 @@ struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
       return;
     }
     self->currBasicBlock->contents.actions.emplace_back(LivenessAction::Set, curr->index, currp);
-    // if this is a copy, note it
-    if (auto* get = self->getCopy(curr)) {
-      // add 2 units, so that backedge prioritization can decide ties, but not much more
-      self->addCopy(curr->index, get->index);
-      self->addCopy(curr->index, get->index);
-    }
-  }
-
-  // A simple copy is a set of a get. A more interesting copy
-  // is a set of an if with a value, where one side a get.
-  // That can happen when we create an if value in simplify-locals. TODO: recurse into
-  // nested ifs, and block return values? Those cases are trickier, need to
-  // count to see if worth it.
-  // TODO: an if can have two copies
-  GetLocal* getCopy(SetLocal* set) {
-    if (auto* get = set->value->dynCast<GetLocal>()) return get;
-    if (auto* iff = set->value->dynCast<If>()) {
-      if (auto* get = iff->ifTrue->dynCast<GetLocal>()) return get;
-      if (iff->ifFalse) {
-        if (auto* get = iff->ifFalse->dynCast<GetLocal>()) return get;
-      }
-    }
-    return nullptr;
   }
 
   // main entry point
