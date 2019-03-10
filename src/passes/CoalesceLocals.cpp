@@ -407,7 +407,7 @@ void CoalesceLocalsWithLearning::pickIndices(std::vector<Index>& indices) {
       for (Index i = 0; i < parent->numLocals; i++) {
         if ((*order)[i] == i) fitness += fragment; // boost for each that wasn't moved
       }
-      fitness = (100 * fitness) + removedCopies; // removing copies is a secondary concern
+      fitness = fitness + 100 * removedCopies; // removing copies is a secondary concern
       order->setFitness(fitness);
     }
 
