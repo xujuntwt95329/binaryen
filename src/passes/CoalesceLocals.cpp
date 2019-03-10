@@ -20,6 +20,26 @@
 // is similar to register allocation, however, there is never any
 // spilling, and there isn't a fixed number of locals.
 //
+// Our main focus here is on minimizing the number of copies, and not
+// locals (although fewer locals can mean fewer copies in many cases).
+// The reason is that copies actually take code size in wasm, while usually
+// defining more locals does not - it at worst makes the compressed size
+// less efficient (due to using more indexes). We also do not need to care
+// about register pressure; the wasm VM running the code will do that.
+//
+// We operate on Binaryen IR here, which is not in SSA form. Doing so
+// gives us a guarantee of not increasing the number of locals, and also
+// lets us see copies directly. The downside is that if two sets share a
+// local index, we will not split them up - we assume they share it for a
+// good reason (i.e. a phi). You can run the SSA pass before this one to
+// make this pass more effective on already-coalesced code.
+//
+// While we don't work on SSA form, as we said copies matter a lot to us,
+// and so we analyze them very carefully, which does entail analyzing each
+// set to see where it is live. But as mentioned earlier, we keep sets of
+// a single local grouped together, which simplifies things for us; again,
+// you can optionally run the SSA pass earlier.
+//
 
 
 #include <algorithm>
