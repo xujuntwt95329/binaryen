@@ -30,12 +30,7 @@
 
 namespace wasm {
 
-// A set of locals. This is optimized for comparisons,
-// mergings, and iteration on elements, assuming that there
-// may be a great many potential elements but actual sets
-// may be fairly small. Specifically, we use a sorted
-// vector.
-typedef SortedVector LocalSet;
+namespace CFG {
 
 // A liveness-relevant action. Supports a get, a set, or an
 // "other" which can be used for other purposes, to mark
@@ -49,7 +44,6 @@ struct LivenessAction {
   What what;
   Index index; // the local index read or written
   Expression** origin; // the origin
-  bool effective; // whether a store is actually effective, i.e., may be read
 
   LivenessAction(What what, Index index, Expression** origin) : what(what), index(index), origin(origin), effective(false) {
     assert(what != Other);
@@ -62,10 +56,25 @@ struct LivenessAction {
   bool isSet() { return what == Set; }
   bool isOther() { return what == Other; }
 
-  // Helper to remove a set that is a copy we know is not needed. This
+  GetLocal* getGet() {
+    if (isGet()) {
+      return (*origin)->cast<GetLocal>();
+    }
+    return nullptr;
+  }
+
+  SetLocal* getSet() {
+    if (isSet()) {
+      return (*origin)->cast<SetLocal>();
+    }
+    return nullptr;
+  }
+
+  // Helper to remove a set that we know is not needed. This
   // updates both the IR and the action.
-  void removeCopy() {
-    auto* set = (*origin)->cast<SetLocal>();
+  void removeSet() {
+    assert(isSet());
+    auto* set = getSet();
     if (set->isTee()) {
       *origin = set->value->cast<GetLocal>();
     } else {
@@ -78,9 +87,18 @@ struct LivenessAction {
   }
 };
 
+// A set of local indexes. This is optimized for comparisons,
+// mergings, and iteration on elements, assuming that there
+// may be a great many potential elements but actual sets
+// may be fairly small. Specifically, we use a sorted
+// vector.
+using IndexSet = SortedVector;
+
+// A set of SetLocals.
+using SetSet = std::set<SetLocal*>;
+
 // information about liveness in a basic block
 struct Liveness {
-  LocalSet start, end; // live locals at the start and end
   std::vector<LivenessAction> actions; // actions occurring in this block
 
 #if LIVENESS_DEBUG
@@ -92,16 +110,19 @@ struct Liveness {
     }
   }
 #endif // LIVENESS_DEBUG
+
+  // Live indexes and sets, at the start and end
+  IndexSet startIndexes, endIndexes;
+  SetSet startSets, endSets;
 };
 
 template<typename SubType, typename VisitorType>
 struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
-  typedef typename CFGWalker<SubType, VisitorType, Liveness>::BasicBlock BasicBlock;
+  using Super = CFGWalker<SubType, VisitorType, Liveness>;
+  using BasicBlock = Super::BasicBlock;
 
   Index numLocals;
   std::unordered_set<BasicBlock*> liveBlocks;
-  std::vector<uint8_t> copies; // canonicalized - accesses should check (low, high) TODO: use a map for high N, as this tends to be sparse? or don't look at copies at all for big N?
-  std::vector<Index> totalCopies; // total # of copies for each local, with all others
 
   // cfg traversal work
 
@@ -112,7 +133,7 @@ struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
       *currp = Builder(*self->getModule()).replaceWithIdenticalType(curr);
       return;
     }
-    self->currBasicBlock->contents.actions.emplace_back(LivenessAction::Get, curr->index, currp);
+    self->currBasicBlock->actions.emplace_back(LivenessAction::Get, curr->index, currp);
   }
 
   static void doVisitSetLocal(SubType* self, Expression** currp) {
@@ -126,57 +147,58 @@ struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
       }
       return;
     }
-    self->currBasicBlock->contents.actions.emplace_back(LivenessAction::Set, curr->index, currp);
-    // if this is a copy, note it
-    if (auto* get = self->getCopy(curr)) {
-      // add 2 units, so that backedge prioritization can decide ties, but not much more
-      self->addCopy(curr->index, get->index);
-      self->addCopy(curr->index, get->index);
-    }
-  }
-
-  // A simple copy is a set of a get. A more interesting copy
-  // is a set of an if with a value, where one side a get.
-  // That can happen when we create an if value in simplify-locals. TODO: recurse into
-  // nested ifs, and block return values? Those cases are trickier, need to
-  // count to see if worth it.
-  // TODO: an if can have two copies
-  GetLocal* getCopy(SetLocal* set) {
-    if (auto* get = set->value->dynCast<GetLocal>()) return get;
-    if (auto* iff = set->value->dynCast<If>()) {
-      if (auto* get = iff->ifTrue->dynCast<GetLocal>()) return get;
-      if (iff->ifFalse) {
-        if (auto* get = iff->ifFalse->dynCast<GetLocal>()) return get;
-      }
-    }
-    return nullptr;
+    self->currBasicBlock->actions.emplace_back(LivenessAction::Set, curr->index, currp);
   }
 
   // main entry point
 
   void doWalkFunction(Function* func) {
     numLocals = func->getNumLocals();
-    copies.resize(numLocals * numLocals);
-    std::fill(copies.begin(), copies.end(), 0);
-    totalCopies.resize(numLocals);
-    std::fill(totalCopies.begin(), totalCopies.end(), 0);
-    // create the CFG by walking the IR
-    CFGWalker<SubType, VisitorType, Liveness>::doWalkFunction(func);
-    // ignore links to dead blocks, so they don't confuse us and we can see their stores are all ineffective
-    liveBlocks = CFGWalker<SubType, VisitorType, Liveness>::findLiveBlocks();
-    CFGWalker<SubType, VisitorType, Liveness>::unlinkDeadBlocks(liveBlocks);
-    // flow liveness across blocks
-    flowLiveness();
+    // Create the CFG by walking the IR.
+    Super::doWalkFunction(func);
+    // Ignore links to dead blocks, so they don't confuse us and we can see their stores are all ineffective
+    liveBlocks = Super::findLiveBlocks();
+    Super::unlinkDeadBlocks(liveBlocks);
+    // Flow index liveness first.
+    flowIndexLiveness();
+    // Flow sets, using the index liveness info.
+    flowSetLiveness();
   }
 
-  void flowLiveness() {
+  void flowIndexLiveness() {
+    // merge starts of a list of blocks. return
+    // whether anything changed vs an old state (which indicates further processing is necessary).
+    auto mergeStartsAndCheckChange = [this](std::vector<BasicBlock*>& blocks, LocalSet& old, LocalSet& ret) {
+      if (blocks.size() == 0) return false;
+      ret = blocks[0]->startIndexes;
+      if (blocks.size() > 1) {
+        // more than one, so we must merge
+        for (Index i = 1; i < blocks.size(); i++) {
+          ret = ret.merge(blocks[i]->startIndexes);
+        }
+      }
+      return old != ret;
+    };
+
+    auto scanLivenessThroughActions = [this](std::vector<LivenessAction>& actions, LocalSet& live) {
+      // move towards the front
+      for (int i = int(actions.size()) - 1; i >= 0; i--) {
+        auto& action = actions[i];
+        if (action.isGet()) {
+          live.insert(action.index);
+        } else if (action.isSet()) {
+          live.erase(action.index);
+        }
+      }
+    };
+
     // keep working while stuff is flowing
-    std::unordered_set<BasicBlock*> queue;
-    for (auto& curr : CFGWalker<SubType, VisitorType, Liveness>::basicBlocks) {
-      if (liveBlocks.count(curr.get()) == 0) continue; // ignore dead blocks
-      queue.insert(curr.get());
+    std::set<BasicBlock*> queue;
+    for (auto& block : Super::basicBlocks) {
+      if (liveBlocks.count(block.get()) == 0) continue; // ignore dead blocks
+      queue.insert(block.get());
       // do the first scan through the block, starting with nothing live at the end, and updating the liveness at the start
-      scanLivenessThroughActions(curr->contents.actions, curr->contents.start);
+      scanLivenessThroughActions(block->actions, block->startIndexes);
     }
     // at every point in time, we assume we already noted interferences between things already known alive at the end, and scanned back through the block using that
     while (queue.size() > 0) {
@@ -184,58 +206,91 @@ struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
       auto* curr = *iter;
       queue.erase(iter);
       LocalSet live;
-      if (!mergeStartsAndCheckChange(curr->out, curr->contents.end, live)) continue;
-      assert(curr->contents.end.size() < live.size());
-      curr->contents.end = live;
-      scanLivenessThroughActions(curr->contents.actions, live);
+      if (!mergeStartsAndCheckChange(curr->out, curr->endIndexes, live)) continue;
+      assert(curr->endIndexes.size() < live.size());
+      curr->endIndexes = live;
+      scanLivenessThroughActions(curr->actions, live);
       // liveness is now calculated at the start. if something
       // changed, all predecessor blocks need recomputation
-      if (curr->contents.start == live) continue;
-      assert(curr->contents.start.size() < live.size());
-      curr->contents.start = live;
+      if (curr->startIndexes == live) continue;
+      assert(curr->startIndexes.size() < live.size());
+      curr->startIndexes = live;
       for (auto* in : curr->in) {
         queue.insert(in);
       }
     }
   }
 
-  // merge starts of a list of blocks. return
-  // whether anything changed vs an old state (which indicates further processing is necessary).
-  bool mergeStartsAndCheckChange(std::vector<BasicBlock*>& blocks, LocalSet& old, LocalSet& ret) {
-    if (blocks.size() == 0) return false;
-    ret = blocks[0]->contents.start;
-    if (blocks.size() > 1) {
-      // more than one, so we must merge
-      for (Index i = 1; i < blocks.size(); i++) {
-        ret = ret.merge(blocks[i]->contents.start);
+  void flowSetLiveness() {
+    // Flow the sets in each block to the end of the block.
+    std::map<Index, SetLocal*> indexSets;
+    for (auto& block : Super::basicBlocks) {
+      if (liveBlocks.count(block.get()) == 0) continue; // ignore dead blocks
+      for (auto& action : block.actions) {
+        if (auto* set = action.getSet()) {
+          // Possibly overwrite a previous set.
+          indexSets[action.index] = set;
+        }
+      }
+      // We know which sets may be live at the end. Verify by our knowledge of index liveness.
+      for (auto& pair : indexSets) {
+        auto index = pair.first;
+        auto* set = pair.second;
+        if (block->endIndexes.has(index)) {
+          block->endSets.insert(set);
+        }
       }
     }
-    return old != ret;
-  }
 
-  void scanLivenessThroughActions(std::vector<LivenessAction>& actions, LocalSet& live) {
-    // move towards the front
-    for (int i = int(actions.size()) - 1; i >= 0; i--) {
-      auto& action = actions[i];
-      if (action.isGet()) {
-        live.insert(action.index);
-      } else if (action.isSet()) {
-        live.erase(action.index);
+    // Find out for each block which indexes are set in it. This lets us quickly see if
+    // a set flows through a block.
+    std::map<BasicBlock*, IndexSet> blockIndexesSet;
+    for (auto& block : Super::basicBlocks) {
+      if (liveBlocks.count(block.get()) == 0) continue; // ignore dead blocks
+      for (auto& action : setBlock.actions) {
+        if (action.isSet()) {
+          blockIndexesSet[block.get()].insert(action.index);
+        }
       }
     }
-  }
 
-  void addCopy(Index i, Index j) {
-    auto k = std::min(i, j) * numLocals + std::max(i, j);
-    copies[k] = std::min(copies[k], uint8_t(254)) + 1;
-    totalCopies[i]++;
-    totalCopies[j]++;
-  }
-
-  uint8_t getCopies(Index i, Index j) {
-    return copies[std::min(i, j) * numLocals + std::max(i, j)];
+    // Flow sets forward through blocks.
+    // TODO: batching?
+    for (auto& block : Super::basicBlocks) {
+      if (liveBlocks.count(block.get()) == 0) continue; // ignore dead blocks
+      for (auto& action : setBlock.actions) {
+        if (auto* set = action.getSet()) {
+          if (block->endSets.count(set)) {
+            // This set is live at the end of the block - do the flow.
+            std::set<BasicBlock*> queue;
+            for (auto* succ : block->out) {
+              queue.insert(succ);
+            }
+            while (queue.size() > 0) {
+              auto iter = queue.begin();
+              auto* block = *iter;
+              queue.erase(iter);
+              // If already seen here, stop.
+              if (block->startSets.count(set)) continue;
+              block->startSets.insert(set);
+              // If it doesn't flow through, stop.
+              if (blockIndexesSet[block].has(set->index)) continue;
+              // If the index is no longer live, stop.
+              if (!block->endIndexes.has(set->index)) continue;
+              // It made it all the way through!
+              block->endSets.insert(set);
+              for (auto* succ : block->out) {
+                queue.insert(succ);
+              }
+            }
+          }
+        }
+      }
+    }
   }
 };
+
+} // namespace CFG
 
 } // namespace wasm
 

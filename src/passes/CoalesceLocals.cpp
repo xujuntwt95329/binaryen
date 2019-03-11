@@ -529,3 +529,53 @@ Pass *createCoalesceLocalsWithLearningPass() {
 }
 
 } // namespace wasm
+
+#if 0
+  std::map<std::pair<SetLocal*, SetLocal*>> copies; // canonicalized - accesses should check (low_index, high_index)
+  std::map<SetLocal*, Index> totalCopies; // total # of copies for each set, with all others
+
+
+    // if this is a copy, note it
+    if (auto* get = self->getCopy(curr)) {
+      // add 2 units, so that backedge prioritization can decide ties, but not much more
+      self->addCopy(curr->index, get->index);
+      self->addCopy(curr->index, get->index);
+    }
+
+
+
+  // A simple copy is a set of a get. A more interesting copy
+  // is a set of an if with a value, where one side a get.
+  // That can happen when we create an if value in simplify-locals. TODO: recurse into
+  // nested ifs, and block return values? Those cases are trickier, need to
+  // count to see if worth it.
+  // TODO: an if can have two copies
+  GetLocal* getCopy(SetLocal* set) {
+    if (auto* get = set->value->dynCast<GetLocal>()) return get;
+tee too
+    if (auto* iff = set->value->dynCast<If>()) {
+      if (auto* get = iff->ifTrue->dynCast<GetLocal>()) return get;
+      if (iff->ifFalse) {
+        if (auto* get = iff->ifFalse->dynCast<GetLocal>()) return get;
+      }
+    }
+    return nullptr;
+  }
+
+
+  void addCopy(Index i, Index j) {
+    auto k = std::min(i, j) * numLocals + std::max(i, j);
+    copies[k] = std::min(copies[k], uint8_t(254)) + 1;
+    totalCopies[i]++;
+    totalCopies[j]++;
+  }
+
+  uint8_t getCopies(Index i, Index j) {
+    return copies[std::min(i, j) * numLocals + std::max(i, j)];
+  }
+
+    copies.resize(numLocals * numLocals);
+    std::fill(copies.begin(), copies.end(), 0);
+    totalCopies.resize(numLocals);
+    std::fill(totalCopies.begin(), totalCopies.end(), 0);
+#endif

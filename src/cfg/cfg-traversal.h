@@ -40,8 +40,7 @@ struct CFGWalker : public ControlFlowWalker<SubType, VisitorType> {
 
   // public interface
 
-  struct BasicBlock {
-    Contents contents; // custom contents
+  struct BasicBlock : public Contents {
     std::vector<BasicBlock*> out, in;
   };
 
@@ -297,7 +296,7 @@ struct CFGWalker : public ControlFlowWalker<SubType, VisitorType> {
     for (auto& block : basicBlocks) {
       assert(debugIds.count(block.get()) > 0);
       std::cout << "  block " << debugIds[block.get()] << ":\n";
-      block->contents.dump(static_cast<SubType*>(this)->getFunction());
+      block->dump(static_cast<SubType*>(this)->getFunction());
       for (auto& in : block->in) {
         assert(debugIds.count(in) > 0);
         assert(std::find(in->out.begin(), in->out.end(), block.get()) != in->out.end()); // must be a parallel link back
