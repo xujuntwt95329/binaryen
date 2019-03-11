@@ -126,7 +126,7 @@ void CoalesceLocals::increaseBackEdgePriorities() {
     for (Index i = 1; i < in.size(); i++) {
       auto* arrivingBlock = in[i];
       if (arrivingBlock->out.size() > 1) continue; // we just want unconditional branches to the loop top, true phi fragments
-      for (auto& action : arrivingBlock->contents.actions) {
+      for (auto& action : arrivingBlock->actions) {
         if (action.isSet()) {
           auto* set = (*action.origin)->cast<SetLocal>();
           if (auto* get = getCopy(set)) {
@@ -145,10 +145,10 @@ void CoalesceLocals::calculateInterferences() {
   for (auto& curr : basicBlocks) {
     if (liveBlocks.count(curr.get()) == 0) continue; // ignore dead blocks
     // everything coming in might interfere, as it might come from a different block
-    auto live = curr->contents.end;
+    auto live = curr->end;
     calculateInterferences(live);
     // scan through the block itself
-    auto& actions = curr->contents.actions;
+    auto& actions = curr->actions;
     for (int i = int(actions.size()) - 1; i >= 0; i--) {
       auto& action = actions[i];
       auto index = action.index;
@@ -167,7 +167,7 @@ void CoalesceLocals::calculateInterferences() {
   }
   // Params have a value on entry, so mark them as live, as variables
   // live at the entry expect their zero-init value.
-  LocalSet start = entry->contents.start;
+  LocalSet start = entry->start;
   auto numParams = getFunction()->getNumParams();
   for (Index i = 0; i < numParams; i++) {
     start.insert(i);
@@ -337,7 +337,7 @@ void CoalesceLocals::pickIndices(std::vector<Index>& indices) {
 void CoalesceLocals::applyIndices(std::vector<Index>& indices, Expression* root) {
   assert(indices.size() == numLocals);
   for (auto& curr : basicBlocks) {
-    auto& actions = curr->contents.actions;
+    auto& actions = curr->actions;
     for (auto& action : actions) {
       if (action.isGet()) {
         auto* get = (*action.origin)->cast<GetLocal>();

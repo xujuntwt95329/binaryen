@@ -56,7 +56,7 @@ struct Flower : public CFGWalker<Flower, Visitor<Flower>, Info> {
     auto* curr = (*currp)->cast<GetLocal>();
      // if in unreachable code, skip
     if (!self->currBasicBlock) return;
-    self->currBasicBlock->contents.actions.emplace_back(curr);
+    self->currBasicBlock->actions.emplace_back(curr);
     self->locations[curr] = currp;
   }
 
@@ -64,8 +64,8 @@ struct Flower : public CFGWalker<Flower, Visitor<Flower>, Info> {
     auto* curr = (*currp)->cast<SetLocal>();
     // if in unreachable code, skip
     if (!self->currBasicBlock) return;
-    self->currBasicBlock->contents.actions.emplace_back(curr);
-    self->currBasicBlock->contents.lastSets[curr->index] = curr;
+    self->currBasicBlock->actions.emplace_back(curr);
+    self->currBasicBlock->lastSets[curr->index] = curr;
     self->locations[curr] = currp;
   }
 
@@ -111,7 +111,7 @@ struct Flower : public CFGWalker<Flower, Visitor<Flower>, Info> {
       // Get the equivalent block to entry in the flow list
       if (block.get() == entry) entryFlowBlock = &flowBlock;
       flowBlock.lastTraversedIteration = NULL_ITERATION;
-      flowBlock.actions.swap(block->contents.actions);
+      flowBlock.actions.swap(block->actions);
       // Map in block to flow blocks
       auto& in = block->in;
       flowBlock.in.resize(in.size());
@@ -119,8 +119,8 @@ struct Flower : public CFGWalker<Flower, Visitor<Flower>, Info> {
         return basicToFlowMap[block];
       });
       // Convert unordered_map to vector.
-      flowBlock.lastSets.reserve(block->contents.lastSets.size());
-      for (auto set : block->contents.lastSets) {
+      flowBlock.lastSets.reserve(block->lastSets.size());
+      for (auto set : block->lastSets) {
         flowBlock.lastSets.emplace_back(std::make_pair(set.first, set.second));
       }
     }
@@ -130,10 +130,10 @@ struct Flower : public CFGWalker<Flower, Visitor<Flower>, Info> {
     for (auto& block : flowBlocks) {
 #ifdef LOCAL_GRAPH_DEBUG
       std::cout << "basic block " << block.get() << " :\n";
-      for (auto& action : block->contents.actions) {
+      for (auto& action : block->actions) {
         std::cout << "  action: " << *action << '\n';
       }
-      for (auto* lastSet : block->contents.lastSets) {
+      for (auto* lastSet : block->lastSets) {
         std::cout << "  last set " << lastSet << '\n';
       }
 #endif
