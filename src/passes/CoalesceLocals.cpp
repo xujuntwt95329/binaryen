@@ -158,7 +158,7 @@ void CoalesceLocals::calculateInterferences() {
         for (auto i : live) {
           interfere(i, index);
         }
-      } else {
+      } else if (action.isSet()) {
         if (live.erase(index)) {
           action.effective = true;
         }
