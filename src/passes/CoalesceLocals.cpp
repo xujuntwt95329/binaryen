@@ -172,11 +172,127 @@ private:
   }
 };
 
+// Equivalences between sets, that is, sets that have the exact same value assigned.
+// We can use this to avoid spurious interferences.
+template<typename T>
+class Equivalences {
+public:
+// TODO: handle the zero inits - make a fake set for them
+  Equivalences(T& parent) {
+    GetSets<T> getSets(parent);
+    std::set<SetLocal*> queue;
+    for (auto* block : parent.liveBlocks) {
+      for (auto& action : block.actions) {
+        if (auto* set = action.getSet()) {
+          queue.insert(set);
+        }
+      }
+    }
+    auto addEquivalence = [&](SetLocal* a, SetLocal* b, SetLocal* queue) {
+      if (a == b) return;
+      if (equivalences[a].insert(b).second) {
+        queue.insert(queue);
+      }
+    };
+    // Flow equivalences.
+    while (!queue.empty()) {
+      auto iter = queue.begin();
+      auto* set = *iter;
+      queue.erase(iter);
+      // Apply the value.
+      auto* value = set->value;
+      if (auto* tee = value->dynCast<SetLocal>()) {
+        addEquivalence(set, tee, tee);
+      } else {
+        value = Properties::getFallthrough(value);
+        if (auto* get = value->dynCast<GetLocal>()) {
+          auto& sets = getSets.getSets(get);
+          if (sets.size() == 0) {
+            continue;
+          }
+          auto* first = *sets.begin();
+          if (sets.size() == 1) {
+            addEquivalence(set, first, first);
+          } else {
+            // Any of these sets may arrive, so only if they are all equivalent can we do this.
+            auto& firstEquivalences = equivalences[first];
+            bool ok = true;
+            for (auto* other : sets) {
+              if (other == first) continue;
+              if (!firstEquivalences.count(other)) {
+                ok = false;
+                break;
+              }
+            }
+            if (ok) {
+              addEquivalence(set, first, first);
+            }
+          }
+        }
+      }
+      // Apply the symmetric and  transtive properties
+      auto setEquivalences = equivalences[set];
+      for (auto* other : setEquivalences) {
+        addEquivalence(set, other, other);
+        auto otherEquivalences = equivalences[other];
+        for (auto* other2 : otherEquivalences) {
+          addEquivalence(set, other2, other2);
+        }
+      }
+    }
+  }
+
+private:
+  std::map<SetLocal*, Liveness::SetSet> equivalences;
+};
+
 // Interferences between sets. We assume sets of the same indexes do not interfere.
 template<typename T>
 class Interferences {
 public:
   Interferences(T& parent) {
+    auto interfereBetween = [this](Liveness::LocalSet& set) {
+      Index size = locals.size();
+      for (Index i = 0; i < size; i++) {
+        for (Index j = i + 1; j < size; j++) {
+          interfereLowHigh(locals[i], locals[j]);
+        }
+      }
+    };
+
+    interferences.resize(numLocals * numLocals);
+    std::fill(interferences.begin(), interferences.end(), false);
+    for (auto& curr : basicBlocks) {
+      if (liveBlocks.count(curr.get()) == 0) continue; // ignore dead blocks
+      // everything coming in might interfere, as it might come from a different block
+      auto live = curr->end;
+      interfereBetween(live);
+      // scan through the block itself
+      auto& actions = curr->actions;
+      for (int i = int(actions.size()) - 1; i >= 0; i--) {
+        auto& action = actions[i];
+        auto index = action.index;
+        if (action.isGet()) {
+          // new live local, interferes with all the rest
+          live.insert(index);
+          for (auto i : live) {
+            interfere(i, index);
+          }
+        } else if (action.isSet()) {
+          if (live.erase(index)) {
+            action.effective = true;
+          }
+        }
+      }
+    }
+    // Params have a value on entry, so mark them as live, as variables
+    // live at the entry expect their zero-init value.
+    LocalSet start = entry->start;
+    auto numParams = getFunction()->getNumParams();
+    for (Index i = 0; i < numParams; i++) {
+      start.insert(i);
+    }
+    interfereBetween(start);
   }
 
 private:
@@ -217,10 +333,6 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
 
   void doWalkFunction(Function* func);
 
-  void calculateInterferences();
-
-  void calculateEquivalences();
-
   void pickIndicesFromOrder(std::vector<Index>& order, std::vector<Index>& indices);
   void pickIndicesFromOrder(std::vector<Index>& order, std::vector<Index>& indices, Index& removedCopies);
 
@@ -231,58 +343,12 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
 
 void CoalesceLocals::doWalkFunction(Function* func) {
   super::doWalkFunction(func);
-  // use liveness to find interference
-  calculateInterferences();
+Copies, GetSets, Interferences
   // pick new indices
   std::vector<Index> indices;
   pickIndices(indices);
   // apply indices
   applyIndices(indices, func->body);
-}
-
-void CoalesceLocals::calculateInterferences() {
-  auto interfereBetween = [this](Liveness::LocalSet& set) {
-    Index size = locals.size();
-    for (Index i = 0; i < size; i++) {
-      for (Index j = i + 1; j < size; j++) {
-        interfereLowHigh(locals[i], locals[j]);
-      }
-    }
-  };
-
-  interferences.resize(numLocals * numLocals);
-  std::fill(interferences.begin(), interferences.end(), false);
-  for (auto& curr : basicBlocks) {
-    if (liveBlocks.count(curr.get()) == 0) continue; // ignore dead blocks
-    // everything coming in might interfere, as it might come from a different block
-    auto live = curr->end;
-    calculateInterferences(live);
-    // scan through the block itself
-    auto& actions = curr->actions;
-    for (int i = int(actions.size()) - 1; i >= 0; i--) {
-      auto& action = actions[i];
-      auto index = action.index;
-      if (action.isGet()) {
-        // new live local, interferes with all the rest
-        live.insert(index);
-        for (auto i : live) {
-          interfere(i, index);
-        }
-      } else if (action.isSet()) {
-        if (live.erase(index)) {
-          action.effective = true;
-        }
-      }
-    }
-  }
-  // Params have a value on entry, so mark them as live, as variables
-  // live at the entry expect their zero-init value.
-  LocalSet start = entry->start;
-  auto numParams = getFunction()->getNumParams();
-  for (Index i = 0; i < numParams; i++) {
-    start.insert(i);
-  }
-  calculateInterferences(start);
 }
 
 // Indices decision making
