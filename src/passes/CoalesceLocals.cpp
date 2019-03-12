@@ -54,6 +54,7 @@
 #include "wasm-builder.h"
 #include "support/learning.h"
 #include "support/permutations.h"
+#include "support/symmetrics_relation.h"
 #ifdef CFG_PROFILE
 #include "support/timing.h"
 #endif
@@ -130,7 +131,7 @@ class Copies {
   }
 
   Index getCopies(Index i, Index j) {
-    return copies[std::min(i, j)][std::max(i, j)];
+    return copies.get(i, j);
   }
 
   Index getTotalCopies(Index i) {
@@ -138,11 +139,11 @@ class Copies {
   }
 
 private:
-  std::map<std::pair<Index, Index>> copies; // canonicalized - accesses should check (low_index, high_index)
+  SymmetricPairMap<Index, Index> copies;
   std::map<Index, Index> totalCopies; // total # of copies for each set, with all others
 
   void noteCopy(Index i, Index j, amount) {
-    copies[std::min(i, j)][std::max(i, j)] += amount;
+    copies.get(i, j) += amount;
     totalCopies[i] += amount;
     totalCopies[j] += amount;
   }
@@ -243,7 +244,7 @@ public:
   }
 
 private:
-  std::map<SetLocal*, Liveness::SetSet> equivalences;
+  SymmetricRelation<SetLocal*> equivalences;
 };
 
 // Interferences between sets. We assume sets of the same indexes do not interfere.
@@ -296,30 +297,7 @@ public:
   }
 
 private:
-  std::set<std::pair<SetLocal*, SetLocal*>> interferences; // canonicalized - accesses should check (low, high)
-
-  void noteInterference(SetLocal* a, SetLocal* b) {
-    if (a == b || a->index == b->index) return;
-    if (a->index > b->index) {
-      std::swap(a, b);
-    }
-    interferences.insert(std::pair<SetLocal*, SetLocal*>(a, b));
-  }
-
-// TODO needed?
-  void unInterfere(SetLocal* a, SetLocal* b) {
-    if (a->index > b->index) {
-      std::swap(a, b);
-    }
-    interferences.erase(std::pair<SetLocal*, SetLocal*>(a, b));
-  }
-
-  bool checkInterference(SetLocal* a, SetLocal* b) {
-    if (a->index > b->index) {
-      std::swap(a, b);
-    }
-    return interferences.find(std::pair<SetLocal*, SetLocal*>(a, b)) != interferences.end();
-  }
+  SymmetricRelation<SetLocal*> interferences;
 };
 
 } // anonymous namespace
