@@ -48,6 +48,7 @@
 
 #include "wasm.h"
 #include "pass.h"
+#include "ir/properties.h"
 #include "ir/utils.h"
 #include "cfg/liveness-traversal.h"
 #include "wasm-builder.h"
@@ -59,6 +60,154 @@
 
 namespace wasm {
 
+namespace {
+
+// Calculate the sets that can reach each get.
+// TODO: verify against LocalGraph!
+template<typename T>
+class GetSets {
+public:
+  GetSets(T& parent) {
+    // Flow the sets in each block to the end of the block.
+    for (auto* block : parent.liveBlocks) {
+      std::map<Index, Liveness::SetSet> indexSets;
+      for (auto* set : block->startSets) {
+        indexSets[set->index].insert(set);
+      }
+      for (auto& action : block.actions) {
+        if (auto* set = action.getSet()) {
+          // Possibly overwrite a previous set.
+          indexSets[action.index] = { set };
+        } else if (auto* get = action.getGet()) {
+          getSetses[get] = indexSets[action.index];
+        }
+      }
+    }
+  }
+
+  Liveness::SetSet& getSets(GetLocal* get) {
+    return getSetses[get];
+  }
+
+private:
+  // The sets for each get.
+  std::map<GetLocal*, Liveness::SetSet> getSetses;
+};
+
+// Find copies between locals, and especially prioritize back edges, since a copy
+// there may force us to branch just to do that copy.
+template<typename T>
+class Copies {
+  Copies(T& parent) {
+    for (auto* block : parent.liveBlocks) {
+      for (auto& action : block.actions) {
+        if (auto* set = action.getSet()) {
+          auto copiedIndexes = getCopiedIndexes(set->value);
+          for (auto index : copiedIndexes) {
+            // add 2 units, so that backedge prioritization can decide ties, but not much more
+            noteCopy(set->index, index, 2);
+          }
+        }
+      }
+    }
+    // Add weight to backedges.
+    for (auto* loopTop : parent.loopTops) {
+      // ignore the first edge, it is the initial entry, we just want backedges
+      auto& in = loopTop->in;
+      for (Index i = 1; i < in.size(); i++) {
+        auto* arrivingBlock = in[i];
+        if (arrivingBlock->out.size() > 1) continue; // we just want unconditional branches to the loop top, true phi fragments
+        for (auto& action : arrivingBlock->actions) {
+          if (auto* set = action.getSet()) {
+            auto copiedIndexes = getCopiedIndexes(set->value);
+            for (auto index : copiedIndexes) {
+              noteCopy(set->index, index, 1);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  Index getCopies(Index i, Index j) {
+    return copies[std::min(i, j)][std::max(i, j)];
+  }
+
+  Index getTotalCopies(Index i) {
+    return totalCopies[i];
+  }
+
+private:
+  std::map<std::pair<Index, Index>> copies; // canonicalized - accesses should check (low_index, high_index)
+  std::map<Index, Index> totalCopies; // total # of copies for each set, with all others
+
+  void noteCopy(Index i, Index j, amount) {
+    copies[std::min(i, j)][std::max(i, j)] += amount;
+    totalCopies[i] += amount;
+    totalCopies[j] += amount;
+  }
+
+  std::vector<Index> getCopiedIndexes(Expression* value) {
+    if (auto* get = value->dynCast<GetLocal>()) {
+      return { get->index };
+    } else if (auto* set = value->dynCast<SetLocal>()) {
+      auto ret = getCopiedIndexes(set->value);
+      ret.insert(set->index);
+    } else if (auto* iff = value->dynCast<If>()) {
+      auto ret = getCopiedIndexes(iff->ifTrue);
+      if (iff->ifFalse) {
+        auto otherIndexes = getCopiedIndexes(iff->ifFalse);
+        for (auto other : otherIndexes) {
+          ret.push_back(other);
+        }
+      }
+      return ret;
+    } else {
+      auto* fallthrough = Properties::getFallthrough(value);
+      if (fallthrough != value) {
+        return getCopiedIndexes(fallthrough);
+      }
+    }
+    return {};
+  }
+};
+
+// Interferences between sets. We assume sets of the same indexes do not interfere.
+template<typename T>
+class Interferences {
+public:
+  Interferences(T& parent) {
+  }
+
+private:
+  std::set<std::pair<SetLocal*, SetLocal*>> interferences; // canonicalized - accesses should check (low, high)
+
+  void noteInterference(SetLocal* a, SetLocal* b) {
+    if (a == b || a->index == b->index) return;
+    if (a->index > b->index) {
+      std::swap(a, b);
+    }
+    interferences.insert(std::pair<SetLocal*, SetLocal*>(a, b));
+  }
+
+// TODO needed?
+  void unInterfere(SetLocal* a, SetLocal* b) {
+    if (a->index > b->index) {
+      std::swap(a, b);
+    }
+    interferences.erase(std::pair<SetLocal*, SetLocal*>(a, b));
+  }
+
+  bool checkInterference(SetLocal* a, SetLocal* b) {
+    if (a->index > b->index) {
+      std::swap(a, b);
+    }
+    return interferences.find(std::pair<SetLocal*, SetLocal*>(a, b)) != interferences.end();
+  }
+};
+
+} // anonymous namespace
+
 struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor<CoalesceLocals>>> {
   bool isFunctionParallel() override { return true; }
 
@@ -68,11 +217,9 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
 
   void doWalkFunction(Function* func);
 
-  void increaseBackEdgePriorities();
-
   void calculateInterferences();
 
-  void calculateInterferences(const LocalSet& locals);
+  void calculateEquivalences();
 
   void pickIndicesFromOrder(std::vector<Index>& order, std::vector<Index>& indices);
   void pickIndicesFromOrder(std::vector<Index>& order, std::vector<Index>& indices, Index& removedCopies);
@@ -80,34 +227,10 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
   virtual void pickIndices(std::vector<Index>& indices); // returns a vector of oldIndex => newIndex
 
   void applyIndices(std::vector<Index>& indices, Expression* root);
-
-  // interference state
-
-  std::vector<bool> interferences; // canonicalized - accesses should check (low, high)
-
-  void interfere(Index i, Index j) {
-    if (i == j) return;
-    interferences[std::min(i, j) * numLocals + std::max(i, j)] = 1;
-  }
-
-  void interfereLowHigh(Index low, Index high) { // optimized version where you know that low < high
-    assert(low < high);
-    interferences[low * numLocals + high] = 1;
-  }
-
-  void unInterfere(Index i, Index j) {
-    interferences[std::min(i, j) * numLocals + std::max(i, j)] = 0;
-  }
-
-  bool interferes(Index i, Index j) {
-    return interferences[std::min(i, j) * numLocals + std::max(i, j)];
-  }
 };
 
 void CoalesceLocals::doWalkFunction(Function* func) {
   super::doWalkFunction(func);
-  // prioritize back edges
-  increaseBackEdgePriorities();
   // use liveness to find interference
   calculateInterferences();
   // pick new indices
@@ -117,29 +240,16 @@ void CoalesceLocals::doWalkFunction(Function* func) {
   applyIndices(indices, func->body);
 }
 
-// A copy on a backedge can be especially costly, forcing us to branch just to do that copy.
-// Add weight to such copies, so we prioritize getting rid of them.
-void CoalesceLocals::increaseBackEdgePriorities() {
-  for (auto* loopTop : loopTops) {
-    // ignore the first edge, it is the initial entry, we just want backedges
-    auto& in = loopTop->in;
-    for (Index i = 1; i < in.size(); i++) {
-      auto* arrivingBlock = in[i];
-      if (arrivingBlock->out.size() > 1) continue; // we just want unconditional branches to the loop top, true phi fragments
-      for (auto& action : arrivingBlock->actions) {
-        if (action.isSet()) {
-          auto* set = (*action.origin)->cast<SetLocal>();
-          if (auto* get = getCopy(set)) {
-            // this is indeed a copy, add to the cost (default cost is 2, so this adds 50%, and can mostly break ties)
-            addCopy(set->index, get->index);
-          }
-        }
+void CoalesceLocals::calculateInterferences() {
+  auto interfereBetween = [this](Liveness::LocalSet& set) {
+    Index size = locals.size();
+    for (Index i = 0; i < size; i++) {
+      for (Index j = i + 1; j < size; j++) {
+        interfereLowHigh(locals[i], locals[j]);
       }
     }
-  }
-}
+  };
 
-void CoalesceLocals::calculateInterferences() {
   interferences.resize(numLocals * numLocals);
   std::fill(interferences.begin(), interferences.end(), false);
   for (auto& curr : basicBlocks) {
@@ -173,15 +283,6 @@ void CoalesceLocals::calculateInterferences() {
     start.insert(i);
   }
   calculateInterferences(start);
-}
-
-void CoalesceLocals::calculateInterferences(const LocalSet& locals) {
-  Index size = locals.size();
-  for (Index i = 0; i < size; i++) {
-    for (Index j = i + 1; j < size; j++) {
-      interfereLowHigh(locals[i], locals[j]);
-    }
-  }
 }
 
 // Indices decision making
@@ -529,53 +630,3 @@ Pass *createCoalesceLocalsWithLearningPass() {
 }
 
 } // namespace wasm
-
-#if 0
-  std::map<std::pair<SetLocal*, SetLocal*>> copies; // canonicalized - accesses should check (low_index, high_index)
-  std::map<SetLocal*, Index> totalCopies; // total # of copies for each set, with all others
-
-
-    // if this is a copy, note it
-    if (auto* get = self->getCopy(curr)) {
-      // add 2 units, so that backedge prioritization can decide ties, but not much more
-      self->addCopy(curr->index, get->index);
-      self->addCopy(curr->index, get->index);
-    }
-
-
-
-  // A simple copy is a set of a get. A more interesting copy
-  // is a set of an if with a value, where one side a get.
-  // That can happen when we create an if value in simplify-locals. TODO: recurse into
-  // nested ifs, and block return values? Those cases are trickier, need to
-  // count to see if worth it.
-  // TODO: an if can have two copies
-  GetLocal* getCopy(SetLocal* set) {
-    if (auto* get = set->value->dynCast<GetLocal>()) return get;
-tee too
-    if (auto* iff = set->value->dynCast<If>()) {
-      if (auto* get = iff->ifTrue->dynCast<GetLocal>()) return get;
-      if (iff->ifFalse) {
-        if (auto* get = iff->ifFalse->dynCast<GetLocal>()) return get;
-      }
-    }
-    return nullptr;
-  }
-
-
-  void addCopy(Index i, Index j) {
-    auto k = std::min(i, j) * numLocals + std::max(i, j);
-    copies[k] = std::min(copies[k], uint8_t(254)) + 1;
-    totalCopies[i]++;
-    totalCopies[j]++;
-  }
-
-  uint8_t getCopies(Index i, Index j) {
-    return copies[std::min(i, j) * numLocals + std::max(i, j)];
-  }
-
-    copies.resize(numLocals * numLocals);
-    std::fill(copies.begin(), copies.end(), 0);
-    totalCopies.resize(numLocals);
-    std::fill(totalCopies.begin(), totalCopies.end(), 0);
-#endif

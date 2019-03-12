@@ -117,9 +117,9 @@ struct Liveness {
 template<typename SubType, typename VisitorType>
 struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
   using Super = CFGWalker<SubType, VisitorType, Liveness>;
-  using BasicBlock = Super::BasicBlock;
+  using BasicBlock = typename Super::BasicBlock;
 
-  Index numLocals;
+  // We only care about live blocks, to not be misled by branches that are never taken.
   std::unordered_set<BasicBlock*> liveBlocks;
 
   // cfg traversal work
@@ -151,7 +151,6 @@ struct LivenessWalker : public CFGWalker<SubType, VisitorType, Liveness> {
   // main entry point
 
   void doWalkFunction(Function* func) {
-    numLocals = func->getNumLocals();
     // Create the CFG by walking the IR.
     Super::doWalkFunction(func);
     // Ignore links to dead blocks, so they don't confuse us and we can see their stores are all ineffective
@@ -171,9 +170,8 @@ private:
   std::map<BasicBlock*, Liveness::IndexSet> indexesSetInBlocks;
 
   void calculateIndexesSetInBlocks() {
-    for (auto& block : Super::basicBlocks) {
-      if (liveBlocks.count(block.get()) == 0) continue; // ignore dead blocks
-      for (auto& action : setBlock.actions) {
+    for (auto* block : liveBlocks) {
+      for (auto& action : block.actions) {
         if (action.isSet()) {
           indexesSetInBlocks[block.get()].insert(action.index);
         }
@@ -183,9 +181,9 @@ private:
 
   void flowIndexLiveness() {
     // Flow the indexes in each block to the start of the block.
-    for (auto& block : Super::basicBlocks) {
-      if (liveBlocks.count(block.get()) == 0) continue; // ignore dead blocks
+    for (auto* block : liveBlocks) {
       auto& live = block->startIndexes;
+      auto& actions = block->actions;
       for (int i = int(actions.size()) - 1; i >= 0; i--) {
         auto& action = actions[i];
         if (action.isGet()) {
@@ -197,8 +195,7 @@ private:
     }
 
     // Flow sets backwards through blocks.
-    for (auto& block : Super::basicBlocks) {
-      if (liveBlocks.count(block.get()) == 0) continue; // ignore dead blocks
+    for (auto* block : liveBlocks) {
       auto initialStartIndexes = block->startIndexes;
       for (Index index : initialStartIndexes) {
         std::set<BasicBlock*> queue;
@@ -226,8 +223,7 @@ private:
 
   void flowSetLiveness() {
     // Flow the sets in each block to the end of the block.
-    for (auto& block : Super::basicBlocks) {
-      if (liveBlocks.count(block.get()) == 0) continue; // ignore dead blocks
+    for (auto* block : liveBlocks) {
       std::map<Index, SetLocal*> indexSets;
       for (auto& action : block.actions) {
         if (auto* set = action.getSet()) {
@@ -247,9 +243,8 @@ private:
 
     // Flow sets forward through blocks.
     // TODO: batching?
-    for (auto& block : Super::basicBlocks) {
-      if (liveBlocks.count(block.get()) == 0) continue; // ignore dead blocks
-      for (auto& action : setBlock.actions) {
+    for (auto* block : liveBlocks) {
+      for (auto& action : block.actions) {
         if (auto* set = action.getSet()) {
           if (block->endSets.count(set)) {
             // This set is live at the end of the block - do the flow.
