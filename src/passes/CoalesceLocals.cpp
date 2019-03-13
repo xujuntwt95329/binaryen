@@ -53,6 +53,7 @@
 #include "cfg/liveness-traversal.h"
 #include "wasm-builder.h"
 #include "support/learning.h"
+#include "support/one_time_work_list.h"
 #include "support/permutations.h"
 #include "support/symmetrics_relation.h"
 #ifdef CFG_PROFILE
@@ -180,71 +181,124 @@ class Equivalences {
 public:
 // TODO: handle the zero inits - make a fake set for them
   Equivalences(T& parent) {
-    GetSets<T> getSets(parent);
-    std::set<SetLocal*> queue;
+    calculate(parent);
+  }
+
+  bool areEquivalent(SetLocal* a, SetLocal* b) {
+    return getKnownClass(a) == getKnownClass(b);
+  }
+
+private:
+  // There is a unique id for each class, which this maps sets to.
+  std::map<SetLocal*, Index> equivalenceClasses;
+
+  // Return the class. 0 is the "null class" - we haven't calculated it yet.
+  Index getClass(SetLocal* set) {
+    auto iter = equivalenceClasses.find(set);
+    if (iter == equivalenceClasses.end()) {
+      return 0;
+    }
+    auto ret = iter->second;
+    assert(ret != 0);
+    return ret;
+  }
+
+  Index getKnownClass(SetLocal* set) {
+    auto ret = getClass(set);
+    assert(ret != 0);
+    return ret;
+  }
+
+  bool known(SetLocal* set) {
+    return getClass(set) != 0;
+  }
+
+  void calculate(T& parent);
+    // Set up the graph of direct connections. We'll use this to calculate the final
+    // equivalence classes (since being equivalent is a symmetric, transitivie, and
+    // reflexive operation).
+    struct Node {
+      SetLocal* set;
+      std::vector<Node*> directs; // direct equivalences, resulting from copying a value
+      std::vector<Node*> mergesIn, mergesOut;
+
+      void addDirect(Node* other) {
+        directs.push_back(other);
+        other->directs.push_back(this);
+      }
+    };
+    std::map<SetLocal*, std::unique_ptr<Node>> setNodes;
     for (auto* block : parent.liveBlocks) {
       for (auto& action : block.actions) {
         if (auto* set = action.getSet()) {
-          queue.insert(set);
+          auto node = make_unique<Node>();
+          node->set = set;
+          setNodes.emplace(set, node);
         }
       }
     }
-    auto addEquivalence = [&](SetLocal* a, SetLocal* b, SetLocal* queue) {
-      if (a == b) return;
-      if (equivalences[a].insert(b).second) {
-        queue.insert(queue);
-      }
-    };
-    // Flow equivalences.
-    while (!queue.empty()) {
-      auto iter = queue.begin();
-      auto* set = *iter;
-      queue.erase(iter);
-      // Apply the value.
+    GetSets<T> getSets(parent);
+    for (auto& pair : setNodes) {
+      auto* set = pair.first;
+      auto& node = pair.second;
       auto* value = set->value;
+      // Look through trivial fallthrough-ing (but stop if the value were used - TODO?)
+      value = Properties::getUnusedFallthrough(value);
       if (auto* tee = value->dynCast<SetLocal>()) {
-        addEquivalence(set, tee, tee);
-      } else {
-        value = Properties::getFallthrough(value);
-        if (auto* get = value->dynCast<GetLocal>()) {
-          auto& sets = getSets.getSets(get);
-          if (sets.size() == 0) {
-            continue;
-          }
-          auto* first = *sets.begin();
-          if (sets.size() == 1) {
-            addEquivalence(set, first, first);
-          } else {
-            // Any of these sets may arrive, so only if they are all equivalent can we do this.
-            auto& firstEquivalences = equivalences[first];
-            bool ok = true;
-            for (auto* other : sets) {
-              if (other == first) continue;
-              if (!firstEquivalences.count(other)) {
-                ok = false;
-                break;
-              }
-            }
-            if (ok) {
-              addEquivalence(set, first, first);
-            }
+        node->addDirect(setNodes[tee].get());
+      } else if (auto* get = value->dynCast<GetLocal>()) {
+        auto& sets = getSets.getSets(get);
+        if (sets.size() == 1) {
+          node->addDirect(setNodes[*sets.begin()].get());
+        } else if (sets.size() > 1) {
+          for (auto* otherSet : sets) {
+            auto& otherNode = setNodes[other];
+            node->mergesIn.push_back(otherNode.get());
+            otherNode->mergesOut.push_back(node.get());
           }
         }
       }
-      // Apply the symmetric and  transtive properties
-      auto setEquivalences = equivalences[set];
-      for (auto* other : setEquivalences) {
-        addEquivalence(set, other, other);
-        auto otherEquivalences = equivalences[other];
-        for (auto* other2 : otherEquivalences) {
-          addEquivalence(set, other2, other2);
+    }
+
+    // Calculating the final classes is mostly a simple floodfill operation,
+    // however, merges are more interesting: we can only see that a merge
+    // set is equivalent to another if all the things it merges are equivalent.
+    Index currClass = 0;
+    for (auto& pair : setNodes) {
+      auto& start = pair.second;
+      currClass++;
+      // Floodfill the current node.
+      OneTimeWorkList<Node*> work;
+      work.push(start.get());
+      while (!work.empty()) {
+        auto* curr = work.pop();
+        auto* set = curr->set;
+        assert(!known(set));
+        equivalenceClasses[set] = currClass;
+        for (auto* direct : curr->directs) {
+          work.push(direct);
+        }
+        // Check outgoing merges - we may have enabled a node to be marked as
+        // being in this equivalence class.
+        for (auto* mergeOut : curr->mergesOut) {
+          if (known(mergeOut->set)) {
+            continue;
+          }
+          assert(!mergeOut->mergesIn.empty());
+          bool ok = true;
+          for (auto* mergeIn : mergeOut->mergesIn) {
+            if (getClass(mergeIn) != currClass) {
+              ok = false;
+              break;
+            }
+          }
+          if (ok) {
+            work.push(mergesOut);
+          }
         }
       }
     }
   }
-
-private:
-  SymmetricRelation<SetLocal*> equivalences;
 };
 
 // Interferences between sets. We assume sets of the same indexes do not interfere.

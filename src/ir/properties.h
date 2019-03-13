@@ -148,14 +148,16 @@ inline Index getZeroExtBits(Expression* curr) {
 
 // Returns a falling-through value, that is, it looks through a local.tee
 // and other operations that receive a value and let it flow through them.
-inline Expression* getFallthrough(Expression* curr) {
+// @param allowUsed - whether we allow the value to be used while falling through
+//                    (see getUnusedFallthrough)
+inline Expression* getFallthrough(Expression* curr, bool allowUsed = true) {
   // If the current node is unreachable, there is no value
   // falling through.
   if (curr->type == unreachable) {
     return curr;
   }
   if (auto* set = curr->dynCast<SetLocal>()) {
-    if (set->isTee()) {
+    if (allowUsed && set->isTee()) {
       return getFallthrough(set->value);
     }
   } else if (auto* block = curr->dynCast<Block>()) {
@@ -175,11 +177,18 @@ inline Expression* getFallthrough(Expression* curr) {
       }
     }
   } else if (auto* br = curr->dynCast<Break>()) {
-    if (br->condition && br->value) {
+    if (allowUsed && br->condition && br->value) {
       return getFallthrough(br->value);
     }
   }
   return curr;
+}
+
+// Like getFallthrough, but returns a fallthrough value which is not used
+// while falling through, so it is received just by flowing to the outside.
+// That rules out a tee and br_if anywhere in the middle.
+inline Expression* getUnusedFallthrough(Expression* curr) {
+  return getFallthrough(curr, false);
 }
 
 } // Properties

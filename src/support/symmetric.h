@@ -15,12 +15,9 @@
  */
 
 //
-// Small sets of size 2, that is, pairs that are symmetric and don't care
-// about their order.
-//
-// The basic type must have allow comparison, which we use to
-// canonicalize the order of pairs, so that we can store a set of just
-// half of them.
+// A symmetric pair is basically a small set of size 2, that is, the order
+// of the items doesn't matter. This is implemented by sorting them on
+// creation.
 //
 
 #ifndef wasm_support_symmetric_h
@@ -44,9 +41,7 @@ class SymmetricPair : public std::pair<T, T> {
 template<typename T>
 class SymmetricRelation {
 public:
-  SortedVector() = default;
-
-  void set(T a, T b) {
+  void insert(T a, T b) {
     data.insert(SymmetricPair<T>(a, b));
   }
 
@@ -68,7 +63,7 @@ class SymmetricPairMap {
 public:
   SortedVector() = default;
 
-  void add(T a, T b, U c) {
+  void insert(T a, T b, U c) {
     data[SymmetricPair<T>(a, b)] = c;
   }
 
