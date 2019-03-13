@@ -181,7 +181,7 @@ template<typename T>
 class Equivalences {
 public:
 // TODO: handle the zero inits - make a fake set for them
-  Equivalences(T& parent) {
+  Equivalences(T& parent, GetSets<T>& getSets) : getSets(getSets) {
     calculate(parent);
   }
 
@@ -190,6 +190,8 @@ public:
   }
 
 private:
+  GetSets<T>& getSets;
+
   // There is a unique id for each class, which this maps sets to.
   std::map<SetLocal*, Index> equivalenceClasses;
 
@@ -260,7 +262,6 @@ private:
       assert(nodes[index]->index == index);
       return nodes[index];
     };
-    GetSets<T> getSets(parent);
     for (auto& node : nodes) {
       auto& node = pair.second;
       auto* set = node->set;
@@ -332,38 +333,68 @@ private:
 template<typename T>
 class Interferences {
 public:
-  Interferences(T& parent) {
-    auto interfereBetween = [this](Liveness::LocalSet& set) {
-      Index size = locals.size();
-      for (Index i = 0; i < size; i++) {
-        for (Index j = i + 1; j < size; j++) {
-          interfereLowHigh(locals[i], locals[j]);
+  Interferences(T& parent, GetSets<T>& getSets) : getSets(getSets)) {
+    calculate(parent);
+  }
+
+private:
+  GetSets<T>& getSets;
+
+  void calculate(T& parent) {
+    // Equivalences let us see if two sets that have overlapping lifetimes are actually
+    // in conflict.
+    Equivalences equivalences(parent);
+
+    // TODO: perhaps leave this checking to a cleanup at the end?
+    // Add an interference, if two sets can in fact interfere
+    auto maybeInterfere = [&](SetLocal* a, SetLocal* b) {
+      // 1. A set cannot intefere with itself.
+      // 2. If a set has the same local index, it cannot interfere - we have proof!
+      // 3. If we calculated the values are equivalent, they cannot interfere.
+      if (a != b &&
+          a->index != b->index &&
+          !equivalences.areEquivalent(a, b)) {
+        setInterferences.insert(a, b);
+      }
+    };
+
+    auto interfereBetweenAll = [&](Liveness::SetSet& set) {
+      for (auto* a : set) {
+        for (auto* b : set) {
+          maybeInterfere(a, b);
         }
       }
     };
 
-    interferences.resize(numLocals * numLocals);
-    std::fill(interferences.begin(), interferences.end(), false);
-    for (auto& curr : basicBlocks) {
-      if (liveBlocks.count(curr.get()) == 0) continue; // ignore dead blocks
-      // everything coming in might interfere, as it might come from a different block
-      auto live = curr->end;
-      interfereBetween(live);
+    for (auto* block : parent.liveBlocks) {
+      // Everything coming in might interfere for the first time here, as they
+      // might come from a different block.
+      auto live = curr->endSets;
+      interfereBetweenAll(live);
       // scan through the block itself
       auto& actions = curr->actions;
       for (int i = int(actions.size()) - 1; i >= 0; i--) {
         auto& action = actions[i];
         auto index = action.index;
-        if (action.isGet()) {
-          // new live local, interferes with all the rest
-          live.insert(index);
-          for (auto i : live) {
-            interfere(i, index);
+        if (auto* get = action.getGet()) {
+          // Potentially new live sets start here.
+// TODO zero inits and params - handle them once at the very top, create fake sets for each of them!
+          auto& sets = getSets.getSetsFor(get);
+          for (auto* set : sets) {
+            live.insert(set);
+            for (auto* otherSet : live) {
+              interfere(set, otherSet);
+            }
           }
-        } else if (action.isSet()) {
-          if (live.erase(index)) {
-            action.effective = true;
+        } if (auto* set = action.getSet()) {
+          // This set is no longer live before this.
+          live.erase(set);
+#ifndef NDEBUG
+          // No other set of that index can be live now.
+          for (auto* otherSet : live) {
+            assert(otherSet->index != set->index);
           }
+#endif
         }
       }
     }
@@ -374,11 +405,12 @@ public:
     for (Index i = 0; i < numParams; i++) {
       start.insert(i);
     }
-    interfereBetween(start);
+    interfereBetweenAll(start);
   }
 
 private:
-  SymmetricRelation<SetLocal*> interferences;
+  SymmetricRelation<SetLocal*> setInterferences;
+  SymmetricRelation<Index> indexInterferences;
 };
 
 } // anonymous namespace
