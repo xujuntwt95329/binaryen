@@ -87,7 +87,7 @@ public:
     }
   }
 
-  Liveness::SetSet& getSets(GetLocal* get) {
+  Liveness::SetSet& getSetsFor(GetLocal* get) {
     return getSetses[get];
   }
 
@@ -176,6 +176,7 @@ private:
 
 // Equivalences between sets, that is, sets that have the exact same value assigned.
 // We can use this to avoid spurious interferences.
+// TODO: handle constants here, so separate assigns to "17" are equivalent?
 template<typename T>
 class Equivalences {
 public:
@@ -219,6 +220,8 @@ private:
     // reflexive operation).
     struct Node {
       SetLocal* set;
+      Index index;
+
       std::vector<Node*> directs; // direct equivalences, resulting from copying a value
       std::vector<Node*> mergesIn, mergesOut;
 
@@ -227,49 +230,73 @@ private:
         other->directs.push_back(this);
       }
     };
-    std::map<SetLocal*, std::unique_ptr<Node>> setNodes;
+    std::vector<std::unique_ptr<Node>> nodes;
+    std::map<SetLocal*, Node*> setNodes;
+    // Add parameters and zero inits: For now, make one for each index, but the
+    // zero inits could all be the same, etc. TODO
+    for (Index i = 0; i < parent.getFunction()->getNumLocals(); i++) {
+      auto node = make_unique<Node>();
+      node->set = nullptr;
+      node->index = i;
+      setNodes.emplace(set, node.get());
+      nodes.push_back(std::move(node));
+    }
+    // Add sets in the function body.
     for (auto* block : parent.liveBlocks) {
       for (auto& action : block.actions) {
         if (auto* set = action.getSet()) {
           auto node = make_unique<Node>();
           node->set = set;
-          setNodes.emplace(set, node);
+          node->index = set->index;
+          setNodes.emplace(set, node.get());
+          nodes.push_back(std::move(node));
         }
       }
     }
+    // Link things up.
+    auto getNode = [&](SetLocal* set, Index index) {
+      if (set) return setNodes[set];
+      // A zero init or a param.
+      assert(nodes[index]->index == index);
+      return nodes[index];
+    };
     GetSets<T> getSets(parent);
-    for (auto& pair : setNodes) {
-      auto* set = pair.first;
+    for (auto& node : nodes) {
       auto& node = pair.second;
+      auto* set = node->set;
+      if (!set) {
+        // A zero init or a param. The other side will connect things.
+        continue;
+      }
+      assert(set->index == node->index);
+      auto index = set->index;
       auto* value = set->value;
       // Look through trivial fallthrough-ing (but stop if the value were used - TODO?)
       value = Properties::getUnusedFallthrough(value);
       if (auto* tee = value->dynCast<SetLocal>()) {
-        node->addDirect(setNodes[tee].get());
+        node->addDirect(getNode(tee, index)]);
       } else if (auto* get = value->dynCast<GetLocal>()) {
-        auto& sets = getSets.getSets(get);
+        auto& sets = getSets.getSetsFor(get);
         if (sets.size() == 1) {
-          node->addDirect(setNodes[*sets.begin()].get());
+          node->addDirect(getNode(*sets.begin(), index));
         } else if (sets.size() > 1) {
           for (auto* otherSet : sets) {
-            auto& otherNode = setNodes[other];
-            node->mergesIn.push_back(otherNode.get());
+            auto& otherNode = getNode(other, index);
+            node->mergesIn.push_back(otherNode);
             otherNode->mergesOut.push_back(node.get());
           }
         }
       }
     }
-
     // Calculating the final classes is mostly a simple floodfill operation,
     // however, merges are more interesting: we can only see that a merge
     // set is equivalent to another if all the things it merges are equivalent.
     Index currClass = 0;
-    for (auto& pair : setNodes) {
-      auto& start = pair.second;
+    for (auto& start : nodes) {
       currClass++;
       // Floodfill the current node.
       OneTimeWorkList<Node*> work;
-      work.push(start.get());
+      work.push(start);
       while (!work.empty()) {
         auto* curr = work.pop();
         auto* set = curr->set;
