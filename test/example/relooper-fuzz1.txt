@@ -458,7 +458,9 @@
        )
        (br_if $block$10$break
         (i32.rem_u
-         (call $check)
+         (local.tee $0
+          (call $check)
+         )
          (i32.const 3)
         )
        )
@@ -471,7 +473,9 @@
     )
     (br_if $block$10$break
      (i32.and
-      (call $check)
+      (local.tee $0
+       (call $check)
+      )
       (i32.const 1)
      )
     )
@@ -480,7 +484,7 @@
     (call $print
      (i32.const 3)
     )
-    (drop
+    (local.set $0
      (call $check)
     )
     (br $shape$6$continue)
@@ -489,7 +493,7 @@
   (call $print
    (i32.const 9)
   )
-  (drop
+  (local.set $0
    (call $check)
   )
  )

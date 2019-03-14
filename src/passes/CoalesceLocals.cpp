@@ -80,8 +80,6 @@ protected:
 
   virtual void pickIndices(std::vector<Index>& indices); // returns a vector of oldIndex => newIndex
 
-  void applyIndices(std::vector<Index>& indices, Expression* root);
-
   // Utility components. These might be refactored out at some point if others need them.
 
   // Calculate the sets that can reach each get.
@@ -110,9 +108,34 @@ protected:
       return getSetses[get];
     }
 
-  private:
+    // TODO: make private
     // The sets for each get.
     std::map<GetLocal*, Liveness::SetSet> getSetses;
+  };
+
+  void applyIndices(std::vector<Index>& indices, Expression* root, GetSets& getSets);
+
+  // Calculate the gets each set can reach.
+  // TODO: verify against LocalGraph!
+  class SetGets {
+  public:
+    SetGets(GetSets& getSets) {
+      for (auto& pair : getSets.getSetses) {
+        auto* get = pair.first;
+        auto& sets = pair.second;
+        for (auto* set : sets) {
+          setGetses[set].insert(get);
+        }
+      }
+    }
+
+    std::set<GetLocal*>& getGetsFor(SetLocal* set) {
+      return setGetses[set];
+    }
+
+  private:
+    // The sets for each get.
+    std::map<SetLocal*, std::set<GetLocal*>> setGetses;
   };
 
   // Find copies between locals, and especially prioritize back edges, since a copy
@@ -332,10 +355,7 @@ protected:
   // Interferences between sets. We assume sets of the same indexes do not interfere.
   class Interferences {
   public:
-    void compute(CoalesceLocals& parent) {
-      // Knowing the sets for each get let us find equivalences and liveness.
-      GetSets getSets(parent);
-
+    void compute(CoalesceLocals& parent, GetSets& getSets) {
       // Equivalences let us see if two sets that have overlapping lifetimes are actually
       // in conflict.
       Equivalences equivalences(parent, getSets);
@@ -418,13 +438,14 @@ void CoalesceLocals::doWalkFunction(Function* func) {
   numLocals = func->getNumLocals();
   InstrumentExplicitSets(func, getModule());
   super::doWalkFunction(func);
+  GetSets getSets(*this);
   copies.compute(*this);
-  interferences.compute(*this);
+  interferences.compute(*this, getSets);
   // pick new indices
   std::vector<Index> indices;
   pickIndices(indices);
   // apply indices
-  applyIndices(indices, func->body);
+  applyIndices(indices, func->body, getSets);
 }
 
 // Indices decision making
@@ -576,7 +597,8 @@ void CoalesceLocals::pickIndices(std::vector<Index>& indices) {
   }
 }
 
-void CoalesceLocals::applyIndices(std::vector<Index>& indices, Expression* root) {
+void CoalesceLocals::applyIndices(std::vector<Index>& indices, Expression* root, GetSets& getSets) {
+  SetGets setGets(getSets);
   assert(indices.size() == numLocals);
   for (auto& curr : basicBlocks) {
     auto& actions = curr->actions;
@@ -593,7 +615,11 @@ void CoalesceLocals::applyIndices(std::vector<Index>& indices, Expression* root)
           action.removeSet();
           continue;
         }
-        // remove ineffective actions TODO
+        // remove unneeded sets
+        if (setGets.getGetsFor(set).empty()) {
+          action.removeSet();
+          continue;
+        }
       }
     }
   }

@@ -28,7 +28,12 @@
     (i32.load
      (local.get $2)
     )
-    (i32.const -75)
+    (i32.xor
+     (local.tee $2
+      (i32.const 74)
+     )
+     (i32.const -1)
+    )
    )
   )
   (i32.store

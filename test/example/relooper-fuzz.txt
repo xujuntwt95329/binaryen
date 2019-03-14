@@ -450,29 +450,31 @@
   )
   (if
    (i32.and
-    (call $check)
+    (local.tee $0
+     (call $check)
+    )
     (i32.const 1)
    )
    (block
     (call $print
      (i32.const 8)
     )
-    (drop
+    (local.set $0
      (call $check)
     )
    )
-   (local.set $0
+   (local.set $1
     (i32.const 6)
    )
   )
   (loop $shape$3$continue
    (if
     (i32.eq
-     (local.get $0)
+     (local.get $1)
      (i32.const 6)
     )
     (block
-     (local.set $0
+     (local.set $1
       (i32.const 0)
      )
      (call $print
@@ -481,12 +483,14 @@
      (br_if $shape$3$continue
       (i32.eqz
        (i32.and
-        (call $check)
+        (local.tee $0
+         (call $check)
+        )
         (i32.const 1)
        )
       )
      )
-     (local.set $0
+     (local.set $1
       (i32.const 6)
      )
      (br $shape$3$continue)
@@ -498,7 +502,7 @@
    (br_if $shape$3$continue
     (i32.eqz
      (i32.rem_u
-      (local.tee $1
+      (local.tee $0
        (call $check)
       )
       (i32.const 3)
@@ -508,13 +512,13 @@
    (if
     (i32.eq
      (i32.rem_u
-      (local.get $1)
+      (local.get $0)
       (i32.const 3)
      )
      (i32.const 1)
     )
     (block
-     (local.set $0
+     (local.set $1
       (i32.const 6)
      )
      (br $shape$3$continue)
@@ -523,10 +527,10 @@
      (call $print
       (i32.const 2)
      )
-     (drop
+     (local.set $0
       (call $check)
      )
-     (local.set $0
+     (local.set $1
       (i32.const 6)
      )
      (br $shape$3$continue)
