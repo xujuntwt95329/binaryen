@@ -48,6 +48,7 @@
 
 #include "wasm.h"
 #include "pass.h"
+#include "ir/local-utils.h"
 #include "ir/properties.h"
 #include "ir/utils.h"
 #include "cfg/liveness-traversal.h"
@@ -180,7 +181,6 @@ private:
 template<typename T>
 class Equivalences {
 public:
-// TODO: handle the zero inits - make a fake set for them
   Equivalences(T& parent, GetSets<T>& getSets) : getSets(getSets) {
     calculate(parent);
   }
@@ -222,7 +222,6 @@ private:
     // reflexive operation).
     struct Node {
       SetLocal* set;
-      Index index;
 
       std::vector<Node*> directs; // direct equivalences, resulting from copying a value
       std::vector<Node*> mergesIn, mergesOut;
@@ -234,55 +233,32 @@ private:
     };
     std::vector<std::unique_ptr<Node>> nodes;
     std::map<SetLocal*, Node*> setNodes;
-    // Add parameters and zero inits: For now, make one for each index, but the
-    // zero inits could all be the same, etc. TODO
-    for (Index i = 0; i < parent.getFunction()->getNumLocals(); i++) {
-      auto node = make_unique<Node>();
-      node->set = nullptr;
-      node->index = i;
-      setNodes.emplace(set, node.get());
-      nodes.push_back(std::move(node));
-    }
     // Add sets in the function body.
     for (auto* block : parent.liveBlocks) {
       for (auto& action : block.actions) {
         if (auto* set = action.getSet()) {
           auto node = make_unique<Node>();
           node->set = set;
-          node->index = set->index;
           setNodes.emplace(set, node.get());
           nodes.push_back(std::move(node));
         }
       }
     }
-    // Link things up.
-    auto getNode = [&](SetLocal* set, Index index) {
-      if (set) return setNodes[set];
-      // A zero init or a param.
-      assert(nodes[index]->index == index);
-      return nodes[index];
-    };
     for (auto& node : nodes) {
       auto& node = pair.second;
       auto* set = node->set;
-      if (!set) {
-        // A zero init or a param. The other side will connect things.
-        continue;
-      }
-      assert(set->index == node->index);
-      auto index = set->index;
       auto* value = set->value;
       // Look through trivial fallthrough-ing (but stop if the value were used - TODO?)
       value = Properties::getUnusedFallthrough(value);
       if (auto* tee = value->dynCast<SetLocal>()) {
-        node->addDirect(getNode(tee, index)]);
+        node->addDirect(setNodes[tee]);
       } else if (auto* get = value->dynCast<GetLocal>()) {
         auto& sets = getSets.getSetsFor(get);
         if (sets.size() == 1) {
-          node->addDirect(getNode(*sets.begin(), index));
+          node->addDirect(setNodes[*sets.begin()]);
         } else if (sets.size() > 1) {
           for (auto* otherSet : sets) {
-            auto& otherNode = getNode(other, index);
+            auto& otherNode = setNodes[other];
             node->mergesIn.push_back(otherNode);
             otherNode->mergesOut.push_back(node.get());
           }
@@ -378,7 +354,6 @@ private:
         auto index = action.index;
         if (auto* get = action.getGet()) {
           // Potentially new live sets start here.
-// TODO zero inits and params - handle them once at the very top, create fake sets for each of them!
           auto& sets = getSets.getSetsFor(get);
           for (auto* set : sets) {
             live.insert(set);
@@ -433,8 +408,11 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
 };
 
 void CoalesceLocals::doWalkFunction(Function* func) {
+  InstrumentExplicitSets(func, getModule());
   super::doWalkFunction(func);
+
 Copies, GetSets, Interferences
+
   // pick new indices
   std::vector<Index> indices;
   pickIndices(indices);

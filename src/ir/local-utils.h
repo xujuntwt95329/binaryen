@@ -17,7 +17,9 @@
 #ifndef wasm_ir_local_utils_h
 #define wasm_ir_local_utils_h
 
+#include <wasm-builder.h>
 #include <ir/effects.h>
+#include <ir/literal-utils.h>
 
 namespace wasm {
 
@@ -103,6 +105,41 @@ struct UnneededSetRemover : public PostWalker<UnneededSetRemover> {
     }
     removed = true;
   }
+};
+
+// Add fake sets for the params and zero inits. This makes them explicit, and in particular it
+// means that every get has an actual set. The destructor of this class then removes them.
+class InstrumentExplicitSets {
+public:
+  InstrumentExplicitSets(Function* func, Module* module) {
+    oldBody = func->body;
+    Builder builder(*module);
+    ExpressionList list;
+    for (Index i = 0; i < func->getNumLocals(); i++) {
+      Expression* curr;
+      if (func->isParam(i)) {
+        curr = builder.makeSetLocal(i,
+          builder.makeCall(FAKE, {}, func->getLocalType(i))
+        );
+      } else {
+        curr = builder.makeSetLocal(i,
+          LiteralUtils::makeZero(func->getLocalType(i))
+        );
+      }
+      list.push_back(curr);
+    }
+    list.push_back(func->body);
+    func->body = builder.makeBlock(list);
+  }
+
+  ~InstrumentExplicitSets() {
+    func->body = oldBody;
+  }
+
+private:
+  static const Name FAKE = "Binaryen$InstrumentExplicitSets$fake";
+
+  Expression* oldBody;
 };
 
 } // namespace wasm
