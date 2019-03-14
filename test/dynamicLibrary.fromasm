@@ -16,7 +16,8 @@
  (export "runPostSets" (func $runPostSets))
  (export "_global" (global $_global))
  (func $__ZN3FooC2Ev (; 2 ;) (; has Stack IR ;) (param $0 i32)
-  (local.set $0
+  (local $1 i32)
+  (local.set $1
    (global.get $STACKTOP)
   )
   (global.set $STACKTOP
@@ -40,7 +41,7 @@
    )
   )
   (global.set $STACKTOP
-   (local.get $0)
+   (local.get $1)
   )
  )
  (func $runPostSets (; 3 ;) (; has Stack IR ;)

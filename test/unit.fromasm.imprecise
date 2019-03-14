@@ -220,10 +220,8 @@
  (func $neg (; 16 ;) (; has Stack IR ;)
   (local $0 f32)
   (call_indirect (type $FUNCSIG$vf)
-   (local.tee $0
-    (f32.neg
-     (local.get $0)
-    )
+   (f32.neg
+    (local.get $0)
    )
    (i32.const 9)
   )
@@ -360,60 +358,58 @@
     (i32.const 2)
    )
   )
-  (local.tee $0
+  (i32.add
    (i32.add
     (i32.add
-     (i32.add
-      (call $lb
-       (i32.const 3)
-      )
-      (local.get $0)
+     (call $lb
+      (i32.const 3)
      )
-     (block (result i32)
-      (drop
-       (call $lb
-        (i32.const 4)
-       )
-      )
-      (drop
-       (call $lb
-        (i32.const 5)
-       )
-      )
-      (drop
-       (call $lb
-        (i32.const 6)
-       )
-      )
-      (call $lb
-       (i32.const 7)
-      )
-     )
+     (local.get $0)
     )
     (block (result i32)
      (drop
       (call $lb
-       (i32.const 8)
+       (i32.const 4)
       )
      )
      (drop
       (call $lb
-       (i32.const 9)
+       (i32.const 5)
       )
      )
      (drop
       (call $lb
-       (i32.const 10)
-      )
-     )
-     (drop
-      (call $lb
-       (i32.const 11)
+       (i32.const 6)
       )
      )
      (call $lb
-      (i32.const 12)
+      (i32.const 7)
      )
+    )
+   )
+   (block (result i32)
+    (drop
+     (call $lb
+      (i32.const 8)
+     )
+    )
+    (drop
+     (call $lb
+      (i32.const 9)
+     )
+    )
+    (drop
+     (call $lb
+      (i32.const 10)
+     )
+    )
+    (drop
+     (call $lb
+      (i32.const 11)
+     )
+    )
+    (call $lb
+     (i32.const 12)
     )
    )
   )
@@ -429,22 +425,21 @@
   (i32.const 0)
  )
  (func $zeroInit (; 25 ;) (; has Stack IR ;) (param $0 i32)
+  (local $1 i32)
   (if
    (i32.eq
-    (local.tee $0
+    (if (result i32)
+     (call $lb
+      (i32.const 0)
+     )
      (if (result i32)
       (call $lb
-       (i32.const 0)
-      )
-      (if (result i32)
-       (call $lb
-        (i32.const 1)
-       )
-       (i32.const 3)
-       (local.get $0)
+       (i32.const 1)
       )
       (i32.const 3)
+      (local.get $1)
      )
+     (i32.const 3)
     )
     (i32.const 3)
    )
@@ -656,11 +651,6 @@
     (i32.const 12)
    )
   )
-  (global.set $Int
-   (local.tee $0
-    (global.get $Int)
-   )
-  )
   (call $globalOpts)
   (local.set $0
    (global.get $Int)
@@ -692,26 +682,31 @@
   )
  )
  (func $loophi (; 40 ;) (; has Stack IR ;) (param $0 i32) (param $1 i32)
+  (local $2 i32)
+  (local $3 i32)
+  (local.set $2
+   (local.get $0)
+  )
   (loop $while-in
    (block $while-out
     (call $loophi
-     (local.get $0)
+     (local.get $2)
      (i32.const 0)
     )
     (if
-     (local.tee $1
-      (local.get $0)
+     (local.tee $3
+      (local.get $2)
      )
      (br_if $while-out
-      (local.get $1)
+      (local.get $3)
      )
     )
     (br_if $while-in
      (i32.eq
       (local.get $1)
-      (local.tee $0
+      (local.tee $2
        (i32.add
-        (local.get $0)
+        (local.get $2)
         (i32.const 1)
        )
       )
@@ -986,53 +981,42 @@
   )
  )
  (func $relooperJumpThreading_irreducible (; 45 ;) (; has Stack IR ;) (param $0 i32)
-  (block $__rjto$0
-   (if
-    (i32.ne
-     (local.get $0)
-     (i32.const 100)
-    )
-    (block
-     (local.set $0
-      (i32.const 10)
-     )
-     (br $__rjto$0)
-    )
+  (local $1 i32)
+  (if
+   (i32.eq
+    (local.get $0)
+    (i32.const 100)
    )
    (loop $while-in
     (call $relooperJumpThreading_irreducible
      (i32.const 1337)
     )
-    (local.set $0
-     (i32.const 1)
-    )
     (br $while-in)
    )
   )
-  (if
-   (block (result i32)
-    (if
-     (i32.eq
-      (local.tee $0
-       (select
-        (i32.const 2)
-        (i32.const 10)
-        (i32.eq
-         (local.get $0)
-         (i32.const 200)
-        )
-       )
-      )
-      (i32.const 300)
-     )
-     (local.set $0
-      (i32.const 2)
-     )
-    )
+  (local.set $1
+   (select
+    (i32.const 2)
+    (i32.const 10)
     (i32.eq
      (local.get $0)
-     (i32.const 2)
+     (i32.const 200)
     )
+   )
+  )
+  (if
+   (i32.eq
+    (local.tee $1
+     (select
+      (i32.const 2)
+      (local.get $1)
+      (i32.eq
+       (local.get $0)
+       (i32.const 300)
+      )
+     )
+    )
+    (i32.const 2)
    )
    (call $relooperJumpThreading_irreducible
     (i32.const 1448)
@@ -1040,7 +1024,7 @@
   )
   (if
    (i32.eq
-    (local.get $0)
+    (local.get $1)
     (i32.const 10)
    )
    (call $relooperJumpThreading_irreducible
@@ -1071,14 +1055,9 @@
  (func $dropIgnoredImportInIf (; 48 ;) (; has Stack IR ;) (param $0 i32) (param $1 i32) (param $2 i32)
   (if
    (local.get $0)
-   (block
-    (drop
-     (call $lb
-      (local.get $2)
-     )
-    )
-    (local.set $0
-     (i32.const 1)
+   (drop
+    (call $lb
+     (local.get $2)
     )
    )
   )

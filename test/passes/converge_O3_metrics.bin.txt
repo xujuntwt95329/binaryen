@@ -4,20 +4,20 @@ total
  [memory-data]  : 28      
  [table-data]   : 429     
  [total]        : 131     
- [vars]         : 2       
+ [vars]         : 3       
  binary         : 12      
  block          : 8       
  break          : 3       
  call           : 3       
  call_indirect  : 4       
- const          : 46      
- drop           : 4       
+ const          : 47      
+ drop           : 3       
  global.get     : 1       
  global.set     : 1       
  if             : 3       
  load           : 16      
- local.get      : 19      
- local.set      : 5       
+ local.get      : 18      
+ local.set      : 6       
  loop           : 1       
  store          : 5       
 (module
@@ -80,7 +80,8 @@ total
  )
  (func $_main (; 4 ;) (; has Stack IR ;) (type $7) (result i32)
   (local $0 i32)
-  (drop
+  (local $1 i32)
+  (local.set $1
    (i32.load offset=24
     (i32.add
      (i32.load
@@ -122,13 +123,13 @@ total
    (block $label$2
     (br_if $label$2
      (call_indirect (type $1)
-      (local.get $0)
+      (local.get $1)
       (i32.const 10888)
       (local.get $0)
       (i32.add
        (i32.load offset=48
         (i32.load
-         (local.get $0)
+         (local.get $1)
         )
        )
        (i32.const 8)
@@ -177,7 +178,7 @@ total
      (i32.const 0)
      (call_indirect (type $0)
       (local.get $0)
-      (local.get $0)
+      (i32.const 10)
       (i32.add
        (i32.load offset=52
         (i32.load
@@ -241,20 +242,20 @@ total
  [memory-data]  : 28      
  [table-data]   : 429     
  [total]        : 131     
- [vars]         : 2       
+ [vars]         : 3       
  binary         : 12      
  block          : 8       
  break          : 3       
  call           : 3       
  call_indirect  : 4       
- const          : 46      
- drop           : 4       
+ const          : 47      
+ drop           : 3       
  global.get     : 1       
  global.set     : 1       
  if             : 3       
  load           : 16      
- local.get      : 19      
- local.set      : 5       
+ local.get      : 18      
+ local.set      : 6       
  loop           : 1       
  store          : 5       
 (module
@@ -318,7 +319,8 @@ total
  )
  (func $_main (; 4 ;) (; has Stack IR ;) (type $7) (result i32)
   (local $0 i32)
-  (drop
+  (local $1 i32)
+  (local.set $1
    (i32.load offset=24
     (i32.add
      (i32.load
@@ -360,13 +362,13 @@ total
    (block $label$2
     (br_if $label$2
      (call_indirect (type $1)
-      (local.get $0)
+      (local.get $1)
       (i32.const 10888)
       (local.get $0)
       (i32.add
        (i32.load offset=48
         (i32.load
-         (local.get $0)
+         (local.get $1)
         )
        )
        (i32.const 8)
@@ -415,7 +417,7 @@ total
      (i32.const 0)
      (call_indirect (type $0)
       (local.get $0)
-      (local.get $0)
+      (i32.const 10)
       (i32.add
        (i32.load offset=52
         (i32.load
@@ -479,20 +481,20 @@ total
  [memory-data]  : 28      
  [table-data]   : 429     
  [total]        : 131     
- [vars]         : 2       
+ [vars]         : 3       
  binary         : 12      
  block          : 8       
  break          : 3       
  call           : 3       
  call_indirect  : 4       
- const          : 46      
- drop           : 4       
+ const          : 47      
+ drop           : 3       
  global.get     : 1       
  global.set     : 1       
  if             : 3       
  load           : 16      
- local.get      : 19      
- local.set      : 5       
+ local.get      : 18      
+ local.set      : 6       
  loop           : 1       
  store          : 5       
 (module
@@ -556,7 +558,8 @@ total
  )
  (func $_main (; 4 ;) (; has Stack IR ;) (type $7) (result i32)
   (local $0 i32)
-  (drop
+  (local $1 i32)
+  (local.set $1
    (i32.load offset=24
     (i32.add
      (i32.load
@@ -598,13 +601,13 @@ total
    (block $label$2
     (br_if $label$2
      (call_indirect (type $1)
-      (local.get $0)
+      (local.get $1)
       (i32.const 10888)
       (local.get $0)
       (i32.add
        (i32.load offset=48
         (i32.load
-         (local.get $0)
+         (local.get $1)
         )
        )
        (i32.const 8)
@@ -653,7 +656,7 @@ total
      (i32.const 0)
      (call_indirect (type $0)
       (local.get $0)
-      (local.get $0)
+      (i32.const 10)
       (i32.add
        (i32.load offset=52
         (i32.load

@@ -18,15 +18,12 @@
   (global.get $M)
  )
  (func $legalstub$floats (; 2 ;) (; has Stack IR ;) (param $0 f64) (result f64)
-  (local $1 f32)
   (f64.promote_f32
    (f32.add
-    (local.tee $1
-     (f32.demote_f64
-      (local.get $0)
-     )
+    (f32.const 0)
+    (f32.demote_f64
+     (local.get $0)
     )
-    (local.get $1)
    )
   )
  )

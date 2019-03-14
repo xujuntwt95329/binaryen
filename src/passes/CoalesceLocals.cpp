@@ -422,6 +422,17 @@ protected:
         indexInterferences[a->index].insert(b->index);
         indexInterferences[b->index].insert(a->index);
       }
+
+      // The zero inits interfere with all params; this avoids us seeing a param is unused
+      // and reusing that for a zero init. That could work, but we'd need an explicit zero
+      // init, wasting space.
+      auto* func = parent.getFunction();
+      for (Index i = 0; i < func->getNumParams(); i++) {
+        for (Index j = func->getNumParams(); j < func->getNumLocals(); j++) {
+          indexInterferences[i].insert(j);
+          indexInterferences[j].insert(i);
+        }
+      }
     }
 
     std::map<Index, std::set<Index>> indexInterferences;
@@ -436,7 +447,7 @@ protected:
 
 void CoalesceLocals::doWalkFunction(Function* func) {
   numLocals = func->getNumLocals();
-  InstrumentExplicitSets(func, getModule());
+  InstrumentExplicitSets instrumenter(func, getModule());
   super::doWalkFunction(func);
   GetSets getSets(*this);
   copies.compute(*this);

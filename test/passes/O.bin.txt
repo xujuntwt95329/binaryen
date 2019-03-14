@@ -46,25 +46,29 @@
  )
  (func $3 (; 3 ;) (; has Stack IR ;) (type $0) (param $0 i64) (result i64)
   (local $1 i64)
+  (local $2 i64)
   (local.set $1
+   (local.get $0)
+  )
+  (local.set $2
    (i64.const 1)
   )
   (loop $label$3
    (if
     (i64.ne
-     (local.get $0)
+     (local.get $1)
      (i64.const 0)
     )
     (block
-     (local.set $1
+     (local.set $2
       (i64.mul
-       (local.get $0)
        (local.get $1)
+       (local.get $2)
       )
      )
-     (local.set $0
+     (local.set $1
       (i64.sub
-       (local.get $0)
+       (local.get $1)
        (i64.const 1)
       )
      )
@@ -72,7 +76,7 @@
     )
    )
   )
-  (local.get $1)
+  (local.get $2)
  )
  (func $4 (; 4 ;) (; has Stack IR ;) (type $0) (param $0 i64) (result i64)
   (local $1 i64)

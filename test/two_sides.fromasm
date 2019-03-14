@@ -9,57 +9,49 @@
   (local $5 f64)
   (if (result i32)
    (local.get $4)
-   (local.tee $4
-    (call $f64-to-int
-     (local.tee $5
-      (f64.mul
-       (f64.add
-        (f64.convert_i32_s
-         (local.get $2)
-        )
-        (local.tee $5
-         (f64.convert_i32_s
-          (i32.mul
-           (local.get $0)
-           (local.get $1)
-          )
-         )
+   (call $f64-to-int
+    (f64.mul
+     (f64.add
+      (f64.convert_i32_s
+       (local.get $2)
+      )
+      (local.tee $5
+       (f64.convert_i32_s
+        (i32.mul
+         (local.get $0)
+         (local.get $1)
         )
        )
-       (f64.add
-        (local.get $5)
-        (f64.convert_i32_s
+      )
+     )
+     (f64.add
+      (local.get $5)
+      (f64.convert_i32_s
+       (local.get $3)
+      )
+     )
+    )
+   )
+   (call $f64-to-int
+    (f64.mul
+     (f64.add
+      (f64.convert_i32_s
+       (local.get $2)
+      )
+      (local.tee $5
+       (f64.convert_i32_s
+        (i32.mul
+         (local.get $2)
          (local.get $3)
         )
        )
       )
      )
-    )
-   )
-   (local.tee $4
-    (call $f64-to-int
-     (local.tee $5
-      (f64.mul
-       (f64.add
-        (f64.convert_i32_s
-         (local.get $2)
-        )
-        (local.tee $5
-         (f64.convert_i32_s
-          (i32.mul
-           (local.get $2)
-           (local.get $3)
-          )
-         )
-        )
-       )
-       (f64.add
-        (f64.convert_i32_s
-         (local.get $3)
-        )
-        (local.get $5)
-       )
+     (f64.add
+      (f64.convert_i32_s
+       (local.get $3)
       )
+      (local.get $5)
      )
     )
    )
