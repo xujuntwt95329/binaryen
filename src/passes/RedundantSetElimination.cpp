@@ -68,7 +68,7 @@ struct RedundantSetElimination : public WalkerPass<CFGWalker<RedundantSetElimina
 
   static void doVisitSetLocal(RedundantSetElimination* self, Expression** currp) {
     if (self->currBasicBlock) {
-      self->currBasicBlock->contents.setps.push_back(currp);
+      self->currBasicBlock->setps.push_back(currp);
     }
   }
 
@@ -161,7 +161,7 @@ struct RedundantSetElimination : public WalkerPass<CFGWalker<RedundantSetElimina
 
   void flowValues(Function* func) {
     for (auto& block : basicBlocks) {
-      LocalValues& start = block->contents.start;
+      LocalValues& start = block->start;
       start.resize(numLocals);
       if (block.get() == entry) {
         // params are complex values we can't optimize; vars are zeros
@@ -182,7 +182,7 @@ struct RedundantSetElimination : public WalkerPass<CFGWalker<RedundantSetElimina
         }
       }
       // the ends all begin unseen
-      LocalValues& end = block->contents.end;
+      LocalValues& end = block->end;
       end.resize(numLocals);
       for (Index i = 0; i < numLocals; i++) {
         end[i] = getUnseenValue();
@@ -203,12 +203,12 @@ struct RedundantSetElimination : public WalkerPass<CFGWalker<RedundantSetElimina
       if (!curr->in.empty()) {
         if (curr->in.size() == 1) {
           // just copy the pred, nothing to merge
-          curr->contents.start = (*curr->in.begin())->contents.end;
+          curr->start = (*curr->in.begin())->end;
         } else {
           // perform a merge
           auto in = curr->in;
           for (Index i = 0; i < numLocals; i++) {
-            auto old = curr->contents.start[i];
+            auto old = curr->start[i];
             // If we already had a merge value here, keep it.
             // TODO This may have some false positives, as we may e.g. have
             //      a single pred that first gives us x, then later y after
@@ -252,10 +252,10 @@ struct RedundantSetElimination : public WalkerPass<CFGWalker<RedundantSetElimina
               continue;
             }
             auto iter = in.begin();
-            auto value = (*iter)->contents.end[i];
+            auto value = (*iter)->end[i];
             iter++;
             while (iter != in.end()) {
-              auto otherValue = (*iter)->contents.end[i];
+              auto otherValue = (*iter)->end[i];
               if (value == getUnseenValue()) {
                 value = otherValue;
               } else if (otherValue == getUnseenValue()) {
@@ -267,21 +267,21 @@ struct RedundantSetElimination : public WalkerPass<CFGWalker<RedundantSetElimina
               }
               iter++;
             }
-            curr->contents.start[i] = value;
+            curr->start[i] = value;
           }
         }
       }
 #ifdef RSE_DEBUG
-      dump("start", curr->contents.start);
+      dump("start", curr->start);
 #endif
       // flow values through it, then add those we can reach if they need an update.
-      auto currValues = curr->contents.start; // we'll modify this as we go
-      auto& setps = curr->contents.setps;
+      auto currValues = curr->start; // we'll modify this as we go
+      auto& setps = curr->setps;
       for (auto** setp : setps) {
         auto* set = (*setp)->cast<SetLocal>();
         currValues[set->index] = getValue(set->value, currValues);
       }
-      if (currValues == curr->contents.end) {
+      if (currValues == curr->end) {
         // nothing changed, so no more work to do
         // note that the first iteration this is always not the case,
         // since end contains unseen (and then the comparison ends on
@@ -293,12 +293,12 @@ struct RedundantSetElimination : public WalkerPass<CFGWalker<RedundantSetElimina
       // verify the convergence property mentioned in the NB comment
       // above: the value numbers at the end must be nondecreasing
       for (Index i = 0; i < numLocals; i++) {
-        assert(currValues[i] >= curr->contents.end[i]);
+        assert(currValues[i] >= curr->end[i]);
       }
 #endif
-      curr->contents.end.swap(currValues);
+      curr->end.swap(currValues);
 #ifdef RSE_DEBUG
-      dump("end  ", curr->contents.end);
+      dump("end  ", curr->end);
 #endif
       for (auto* next : curr->out) {
         work.push(next);
@@ -311,8 +311,8 @@ struct RedundantSetElimination : public WalkerPass<CFGWalker<RedundantSetElimina
     // in each block, run the values through the sets,
     // and remove redundant sets when we see them
     for (auto& block : basicBlocks) {
-      auto currValues = block->contents.start; // we'll modify this as we go
-      auto& setps = block->contents.setps;
+      auto currValues = block->start; // we'll modify this as we go
+      auto& setps = block->setps;
       for (auto** setp : setps) {
         auto* set = (*setp)->cast<SetLocal>();
         auto oldValue = currValues[set->index];
@@ -350,10 +350,10 @@ struct RedundantSetElimination : public WalkerPass<CFGWalker<RedundantSetElimina
         std::cout << "  goes to " << out << '\n';
       }
     }
-    for (Index i = 0; i < block->contents.start.size(); i++) {
-      std::cout << "  start[" << i << "] = " << block->contents.start[i] << '\n';
+    for (Index i = 0; i < block->start.size(); i++) {
+      std::cout << "  start[" << i << "] = " << block->start[i] << '\n';
     }
-    for (auto** setp : block->contents.setps) {
+    for (auto** setp : block->setps) {
       std::cout << "  " << *setp << '\n';
     }
     std::cout << "====\n";

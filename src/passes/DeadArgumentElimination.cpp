@@ -96,7 +96,7 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
 
   void visitGetLocal(GetLocal* curr) {
     if (currBasicBlock) {
-      auto& localUses = currBasicBlock->contents.localUses;
+      auto& localUses = currBasicBlock->localUses;
       auto index = curr->index;
       if (localUses.count(index) == 0) {
         localUses[index] = DAEBlockInfo::Read;
@@ -106,7 +106,7 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
 
   void visitSetLocal(SetLocal* curr) {
     if (currBasicBlock) {
-      auto& localUses = currBasicBlock->contents.localUses;
+      auto& localUses = currBasicBlock->localUses;
       auto index = curr->index;
       if (localUses.count(index) == 0) {
         localUses[index] = DAEBlockInfo::Written;
@@ -173,7 +173,7 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
       if (indexes.empty()) {
         continue; // nothing more to flow
       }
-      auto& localUses = block->contents.localUses;
+      auto& localUses = block->localUses;
       SortedVector remainingIndexes;
       for (auto i : indexes) {
         auto iter = localUses.find(i);

@@ -76,7 +76,7 @@ struct LivenessAction {
     // In the common case of a set of a get, e.g. from a copy,
     // we can just nop it.
     auto* value = set->value;
-    if (auto* get = value->dynCast<GetLocal>()) {
+    if (value->is<GetLocal>()) {
       ExpressionManipulator::nop(set);
     } else {
       // Otherwise the value may have side effects, keep it.
