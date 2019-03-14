@@ -56,7 +56,7 @@
 #include "support/learning.h"
 #include "support/one_time_work_list.h"
 #include "support/permutations.h"
-#include "support/symmetrics_relation.h"
+#include "support/symmetric.h"
 #ifdef CFG_PROFILE
 #include "support/timing.h"
 #endif

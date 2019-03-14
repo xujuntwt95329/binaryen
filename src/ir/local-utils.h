@@ -111,10 +111,11 @@ struct UnneededSetRemover : public PostWalker<UnneededSetRemover> {
 // means that every get has an actual set. The destructor of this class then removes them.
 class InstrumentExplicitSets {
 public:
-  InstrumentExplicitSets(Function* func, Module* module) {
+  InstrumentExplicitSets(Function* func, Module* module) : func(func) {
+    const Name FAKE = "Binaryen$InstrumentExplicitSets$fake";
     oldBody = func->body;
     Builder builder(*module);
-    ExpressionList list;
+    ExpressionList list(module->allocator);
     for (Index i = 0; i < func->getNumLocals(); i++) {
       Expression* curr;
       if (func->isParam(i)) {
@@ -123,7 +124,7 @@ public:
         );
       } else {
         curr = builder.makeSetLocal(i,
-          LiteralUtils::makeZero(func->getLocalType(i))
+          LiteralUtils::makeZero(func->getLocalType(i), *module)
         );
       }
       list.push_back(curr);
@@ -137,8 +138,7 @@ public:
   }
 
 private:
-  static const Name FAKE = "Binaryen$InstrumentExplicitSets$fake";
-
+  Function* func;
   Expression* oldBody;
 };
 

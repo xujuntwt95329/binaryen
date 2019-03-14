@@ -32,8 +32,8 @@ namespace wasm {
 template<typename T>
 class SymmetricPair : public std::pair<T, T> {
   SymmetricPair(T a, T b) : std::pair<T, T>(a, b) {
-    if (std::greater(first, second)) {
-      std::swap(first, second);
+    if (std::greater<T>(a, b)) {
+      std::swap(a, b);
     }
   }
 };
