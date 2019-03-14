@@ -73,20 +73,18 @@ struct LivenessAction {
   void removeSet() {
     auto* set = getSet();
     assert(set);
-    // In the common case of a set of a get, e.g. from a copy,
-    // we can just nop it.
     auto* value = set->value;
-    if (value->is<GetLocal>()) {
+    if (set->isTee()) {
+      // A tee's value must be kept around in any case.
+      *origin = value;
+    } else if (value->is<GetLocal>()) {
+      // If the value is a get, we can just nop this set. This handles the common
+      // case of a copy.
       ExpressionManipulator::nop(set);
     } else {
-      // Otherwise the value may have side effects, keep it.
-      if (set->isTee()) {
-        *origin = value;
-      } else {
-        // we need to drop it
-        Drop* drop = ExpressionManipulator::convert<SetLocal, Drop>(set);
-        drop->value = value;
-      }
+      // Otherwise, drop the set value.
+      Drop* drop = ExpressionManipulator::convert<SetLocal, Drop>(set);
+      drop->value = value;
     }
     // Mark as an other: even if we turned the origin into a get
     // or a set (because that was the value of this set), we already
