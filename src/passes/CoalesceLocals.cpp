@@ -378,13 +378,15 @@ public:
     for (auto& pair : setInterferences.data) {
       auto* a = pair.first;
       auto* b = pair.second;
-      indexInterferences.insert(a->index, b->index);
+      indexInterferences.insert[a->index].insert(b->index);
+      indexInterferences.insert[b->index].insert(a->index);
     }
   }
 
+  std::map<Index, std::set<Index>> indexInterferences;
+
 private:
   SymmetricRelation<SetLocal*> setInterferences;
-  SymmetricRelation<Index> indexInterferences;
 };
 
 } // anonymous namespace
@@ -404,6 +406,9 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
   virtual void pickIndices(std::vector<Index>& indices); // returns a vector of oldIndex => newIndex
 
   void applyIndices(std::vector<Index>& indices, Expression* root);
+
+  Copies copies;
+  Interferences interferences;
 };
 
 void CoalesceLocals::doWalkFunction(Function* func) {
@@ -435,27 +440,26 @@ void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector
   std::cerr << '\n';
   std::cerr << "interferences:\n";
   for (Index i = 0; i < numLocals; i++) {
-    for (Index j = 0; j < i + 1; j++) {
-      std::cerr << "  ";
+    std::cerr << i << ": ";
+    for (auto j : interferences.indexInterferences[i]) {
+      std::cerr << j << ' ';
     }
-    for (Index j = i + 1; j < numLocals; j++) {
-      std::cerr << int(interferes(i, j)) << ' ';
-    }
-    std::cerr << " : $" << i << '\n';
+    std::cerr << '\n';
   }
   std::cerr << "copies:\n";
   for (Index i = 0; i < numLocals; i++) {
-    for (Index j = 0; j < i + 1; j++) {
-      std::cerr << "  ";
+    std::cerr << i << ": ";
+    for (Index j = 0; j < numLocals; j++) {
+      auto c = copies.getCopies(i, j);
+      if (c > 0) {
+        std::cerr << j << ':' << c << ' ';
+      }
     }
-    for (Index j = i + 1; j < numLocals; j++) {
-      std::cerr << int(getCopies(i, j)) << ' ';
-    }
-    std::cerr << " : $" << i << '\n';
+    std::cerr << '\n';
   }
   std::cerr << "total copies:\n";
   for (Index i = 0; i < numLocals; i++) {
-    std::cerr << " $" << i << ": " << totalCopies[i] << '\n';
+    std::cerr << " $" << i << ": " << copies.getTotalCopies(i) << '\n';
   }
 #endif
   // TODO: take into account distribution (99-1 is better than 50-50 with two registers, for gzip)
@@ -478,8 +482,8 @@ void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector
     indices[i] = i;
     types[i] = getFunction()->getLocalType(i);
     for (Index j = numParams; j < numLocals; j++) {
-      newInterferences[numLocals * i + j] = interferes(i, j);
-      newCopies[numLocals * i + j] = getCopies(i, j);
+      newInterferences[numLocals * i + j] = interferences.indexInterferences[i].count(j);
+      newCopies[numLocals * i + j] = copies.getCopies(i, j);
     }
     nextFree++;
   }
@@ -502,7 +506,7 @@ void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector
       indices[actual] = found = nextFree;
       types[found] = getFunction()->getLocalType(actual);
       nextFree++;
-      removedCopies += getCopies(found, actual);
+      removedCopies += copies.getCopies(found, actual);
       newCopies.resize(nextFree * numLocals);
     } else {
       removedCopies += foundCopies;
@@ -513,8 +517,8 @@ void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector
     // merge new interferences and copies for the new index
     for (Index k = i + 1; k < numLocals; k++) {
       auto j = order[k]; // go in the order, we only need to update for those we will see later
-      newInterferences[found * numLocals + j] = newInterferences[found * numLocals + j] | interferes(actual, j);
-      newCopies[found * numLocals + j] += getCopies(actual, j);
+      newInterferences[found * numLocals + j] = newInterferences[found * numLocals + j] | nterferences.indexInterferences[actual].count(j);
+      newCopies[found * numLocals + j] += copies.getCopies(actual, j);
     }
   }
 }
