@@ -267,6 +267,7 @@ protected:
           }
         }
       }
+      // Add connections.
       for (auto& node : nodes) {
         auto* set = node->set;
         auto* value = set->value;
@@ -292,6 +293,7 @@ protected:
       // set is equivalent to another if all the things it merges are equivalent.
       Index currClass = 0;
       for (auto& start : nodes) {
+        if (known(start->set)) continue;
         currClass++;
         // Floodfill the current node.
         OneTimeWorkList<Node*> work;
