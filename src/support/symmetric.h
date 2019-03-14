@@ -31,8 +31,9 @@ namespace wasm {
 
 template<typename T>
 class SymmetricPair : public std::pair<T, T> {
+public:
   SymmetricPair(T a, T b) : std::pair<T, T>(a, b) {
-    if (std::greater<T>(a, b)) {
+    if (a > b) {
       std::swap(a, b);
     }
   }
@@ -57,11 +58,9 @@ public:
   std::set<SymmetricPair<T>> data;
 };
 
-template<typename T>
+template<typename T, typename U>
 class SymmetricPairMap {
 public:
-  SortedVector() = default;
-
   void insert(T a, T b, U c) {
     data[SymmetricPair<T>(a, b)] = c;
   }

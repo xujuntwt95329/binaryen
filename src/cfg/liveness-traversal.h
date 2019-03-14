@@ -71,16 +71,26 @@ struct LivenessAction {
   // Helper to remove a set that we know is not needed. This
   // updates both the IR and the action.
   void removeSet() {
-    assert(isSet());
     auto* set = getSet();
-    if (set->isTee()) {
-      *origin = set->value->cast<GetLocal>();
-    } else {
+    assert(set);
+    // In the common case of a set of a get, e.g. from a copy,
+    // we can just nop it.
+    auto* value = set->value;
+    if (auto* get = value->dynCast<GetLocal>()) {
       ExpressionManipulator::nop(set);
+    } else {
+      // Otherwise the value may have side effects, keep it.
+      if (set->isTee()) {
+        *origin = value;
+      } else {
+        // we need to drop it
+        Drop* drop = ExpressionManipulator::convert<SetLocal, Drop>(set);
+        drop->value = value;
+      }
     }
-    // Mark as an other: even if we turned the origin into a get,
-    // we already have another Action for that get, that properly
-    // represents it.
+    // Mark as an other: even if we turned the origin into a get
+    // or a set (because that was the value of this set), we already
+    // have another Action for that get, that properly represents it.
     what = Other;
   }
 };
@@ -171,9 +181,9 @@ private:
 
   void calculateIndexesSetInBlocks() {
     for (auto* block : liveBlocks) {
-      for (auto& action : block.actions) {
+      for (auto& action : block->actions) {
         if (action.isSet()) {
-          indexesSetInBlocks[block.get()].insert(action.index);
+          indexesSetInBlocks[block].insert(action.index);
         }
       }
     }
@@ -207,7 +217,7 @@ private:
           auto* block = *iter;
           queue.erase(iter);
           // If already seen here, stop.
-          if (block->endIndexes.count(index)) continue;
+          if (block->endIndexes.has(index)) continue;
           block->endIndexes.insert(index);
           // If it doesn't flow through, stop.
           if (indexesSetInBlocks[block].has(index)) continue;
@@ -225,7 +235,7 @@ private:
     // Flow the sets in each block to the end of the block.
     for (auto* block : liveBlocks) {
       std::map<Index, SetLocal*> indexSets;
-      for (auto& action : block.actions) {
+      for (auto& action : block->actions) {
         if (auto* set = action.getSet()) {
           // Possibly overwrite a previous set.
           indexSets[action.index] = set;
@@ -244,7 +254,7 @@ private:
     // Flow sets forward through blocks.
     // TODO: batching?
     for (auto* block : liveBlocks) {
-      for (auto& action : block.actions) {
+      for (auto& action : block->actions) {
         if (auto* set = action.getSet()) {
           if (block->endSets.count(set)) {
             // This set is live at the end of the block - do the flow.
