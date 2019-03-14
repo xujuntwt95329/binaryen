@@ -70,7 +70,7 @@
  )
  (func $ineffective-store (; 9 ;) (type $2)
   (local $0 i32)
-  (local.set $0
+  (drop
    (i32.const 0)
   )
   (local.set $0
@@ -1100,11 +1100,9 @@
  (func $unused-tee-with-child-if-no-else (; 49 ;) (type $4) (param $0 i32)
   (loop $label$0
    (drop
-    (local.tee $0
-     (if
-      (br $label$0)
-      (nop)
-     )
+    (if
+     (br $label$0)
+     (nop)
     )
    )
   )
@@ -1144,7 +1142,7 @@
   (nop)
   (if
    (i32.const 1)
-   (local.set $0
+   (drop
     (i32.const 1)
    )
   )
@@ -1156,7 +1154,7 @@
   (nop)
   (if
    (i32.const 1)
-   (local.set $0
+   (drop
     (i32.const 1)
    )
   )
@@ -1171,14 +1169,14 @@
   (nop)
   (if
    (i32.const 1)
-   (local.set $0
+   (drop
     (i32.const 1)
    )
   )
   (nop)
   (if
    (i32.const 1)
-   (local.set $0
+   (drop
     (i32.const 1)
    )
   )
@@ -1191,14 +1189,14 @@
   (nop)
   (if
    (i32.const 1)
-   (local.set $0
+   (drop
     (i32.const 1)
    )
   )
   (nop)
   (nop)
   (nop)
-  (local.set $0
+  (drop
    (i32.const 2)
   )
   (nop)
@@ -1219,7 +1217,7 @@
  (func $proper-type (; 56 ;) (type $10) (result f64)
   (local $0 f64)
   (local $1 i32)
-  (local.set $1
+  (drop
    (select
     (i32.const 0)
     (i32.const 1)

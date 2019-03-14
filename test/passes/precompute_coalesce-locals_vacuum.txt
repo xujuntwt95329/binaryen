@@ -2,12 +2,7 @@
  (type $0 (func (param i32) (result i32)))
  (func $nested-br_if-value (; 0 ;) (type $0) (param $0 i32) (result i32)
   (loop $label$0
-   (block $block
-    (local.set $0
-     (i32.const 4)
-    )
-    (br $label$0)
-   )
+   (br $label$0)
   )
  )
 )

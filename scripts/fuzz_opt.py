@@ -29,6 +29,8 @@ from test.shared import options
 
 FUZZ_OPTS = ['--mvp-features']  # may want to add '--no-fuzz-nans' for cross-VM testing
 
+PASSES = ['--coalesce-locals'] # Set to None to pick at random
+
 INPUT_SIZE_LIMIT = 250 * 1024
 
 LOG_LIMIT = 125
@@ -224,6 +226,8 @@ opt_choices = [
 
 
 def get_multiple_opt_choices():
+  if PASSES:
+    return PASSES
   ret = []
   # core opts
   while 1:

@@ -62,7 +62,7 @@
  )
  (func $ineffective-store (; 7 ;) (type $2)
   (local $0 i32)
-  (local.set $0
+  (drop
    (i32.const 0)
   )
   (local.set $0
