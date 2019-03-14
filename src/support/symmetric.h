@@ -53,7 +53,6 @@ public:
     return data.find(SymmetricPair<T>(a, b)) != data.end();
   }
 
-private:
   // We store only the canonicalized form of each pair, to save half the memory.
   std::set<SymmetricPair<T>> data;
 };

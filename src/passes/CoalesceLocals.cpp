@@ -101,7 +101,7 @@ private:
 // there may force us to branch just to do that copy.
 template<typename T>
 class Copies {
-  Copies(T& parent) {
+  void compute(T& parent) {
     for (auto* block : parent.liveBlocks) {
       for (auto& action : block.actions) {
         if (auto* set = action.getSet()) {
@@ -150,12 +150,14 @@ private:
     totalCopies[j] += amount;
   }
 
+  // Get a list of indexes of copies that we might plausibly optimize out later.
   std::vector<Index> getCopiedIndexes(Expression* value) {
     if (auto* get = value->dynCast<GetLocal>()) {
       return { get->index };
     } else if (auto* set = value->dynCast<SetLocal>()) {
-      auto ret = getCopiedIndexes(set->value);
-      ret.insert(set->index);
+      if (set->isTee()) {
+        return { set->index };
+      }
     } else if (auto* iff = value->dynCast<If>()) {
       auto ret = getCopiedIndexes(iff->ifTrue);
       if (iff->ifFalse) {
@@ -165,12 +167,14 @@ private:
         }
       }
       return ret;
-    } else {
+    }
+#if 0 // TODO: can we plausibly optimize those out later?
       auto* fallthrough = Properties::getFallthrough(value);
       if (fallthrough != value) {
         return getCopiedIndexes(fallthrough);
       }
     }
+#endif
     return {};
   }
 };
@@ -182,7 +186,7 @@ template<typename T>
 class Equivalences {
 public:
   Equivalences(T& parent, GetSets<T>& getSets) : getSets(getSets) {
-    calculate(parent);
+    compute(parent);
   }
 
   bool areEquivalent(SetLocal* a, SetLocal* b) {
@@ -216,7 +220,7 @@ private:
     return getClass(set) != 0;
   }
 
-  void calculate(T& parent);
+  void compute(T& parent);
     // Set up the graph of direct connections. We'll use this to calculate the final
     // equivalence classes (since being equivalent is a symmetric, transitivie, and
     // reflexive operation).
@@ -309,14 +313,7 @@ private:
 template<typename T>
 class Interferences {
 public:
-  Interferences(T& parent, GetSets<T>& getSets) : getSets(getSets)) {
-    calculate(parent);
-  }
-
-private:
-  GetSets<T>& getSets;
-
-  void calculate(T& parent) {
+  void compute(T& parent, GetSets<T>& getSets) {
     // Equivalences let us see if two sets that have overlapping lifetimes are actually
     // in conflict.
     Equivalences equivalences(parent);
@@ -373,14 +370,16 @@ private:
         }
       }
     }
-    // Params have a value on entry, so mark them as live, as variables
-    // live at the entry expect their zero-init value.
-    LocalSet start = entry->start;
-    auto numParams = getFunction()->getNumParams();
-    for (Index i = 0; i < numParams; i++) {
-      start.insert(i);
+    // Note that we don't need any special-casing of params, since we assume the implicit
+    // sets have been instrumented with InstrumentExplicitSets anyhow
+
+    // We computed the interferences between sets. Use that to compute it between local
+    // indexes.
+    for (auto& pair : setInterferences.data) {
+      auto* a = pair.first;
+      auto* b = pair.second;
+      indexInterferences.insert(a->index, b->index);
     }
-    interfereBetweenAll(start);
   }
 
 private:
@@ -410,9 +409,8 @@ struct CoalesceLocals : public WalkerPass<LivenessWalker<CoalesceLocals, Visitor
 void CoalesceLocals::doWalkFunction(Function* func) {
   InstrumentExplicitSets(func, getModule());
   super::doWalkFunction(func);
-
-Copies, GetSets, Interferences
-
+  copies.compute(*this);
+  interferences.compute(*this);
   // pick new indices
   std::vector<Index> indices;
   pickIndices(indices);
@@ -649,7 +647,7 @@ void CoalesceLocalsWithLearning::pickIndices(std::vector<Index>& indices) {
   struct Generator {
     Generator(CoalesceLocalsWithLearning* parent) : parent(parent), noise(42) {}
 
-    void calculateFitness(Order* order) {
+    void computeFitness(Order* order) {
       // apply the order
       std::vector<Index> indices; // the phenotype
       Index removedCopies;
@@ -685,7 +683,7 @@ void CoalesceLocalsWithLearning::pickIndices(std::vector<Index>& indices) {
         // leave params alone, shuffle the rest
         std::shuffle(ret->begin() + parent->getFunction()->getNumParams(), ret->end(), noise);
       }
-      calculateFitness(ret);
+      computeFitness(ret);
 #ifdef CFG_LEARN_DEBUG
       order->dump("new rando");
 #endif
@@ -714,7 +712,7 @@ void CoalesceLocalsWithLearning::pickIndices(std::vector<Index>& indices) {
           i++; // if we don't skip, we might end up pushing an element all the way to the end, which is not very perturbation-y
         }
       }
-      calculateFitness(ret);
+      computeFitness(ret);
 #ifdef CFG_LEARN_DEBUG
       ret->dump("new mixture");
 #endif
