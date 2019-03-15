@@ -113,7 +113,6 @@ class InstrumentExplicitSets {
 public:
   InstrumentExplicitSets(Function* func, Module* module) : func(func) {
     const Name FAKE = "Binaryen$InstrumentExplicitSets$fake";
-    oldBody = func->body;
     Builder builder(*module);
     ExpressionList list(module->allocator);
     for (Index i = 0; i < func->getNumLocals(); i++) {
@@ -130,16 +129,17 @@ public:
       list.push_back(curr);
     }
     list.push_back(func->body);
-    func->body = builder.makeBlock(list);
+    func->body = newBody = builder.makeBlock(list);
   }
 
   ~InstrumentExplicitSets() {
-    func->body = oldBody;
+    assert(func->body == newBody);
+    func->body = newBody->list.back();
   }
 
 private:
   Function* func;
-  Expression* oldBody;
+  Block* newBody;
 };
 
 } // namespace wasm
