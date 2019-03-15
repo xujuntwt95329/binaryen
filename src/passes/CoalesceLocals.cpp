@@ -1,4 +1,4 @@
-//#define CFG_DEBUG 1
+#define CFG_DEBUG 1
 /*
  * Copyright 2016 WebAssembly Community Group participants
  *
@@ -85,7 +85,6 @@ protected:
   // Utility components. These might be refactored out at some point if others need them.
 
   // Create an 0..n indexing of all the sets in the function.
-  // TODO needed?
   class SetIndexer {
   public:
     SetIndexer(CoalesceLocals& parent) {
@@ -378,6 +377,11 @@ protected:
   class Interferences {
   public:
     void compute(CoalesceLocals& parent, GetSets& getSets, SetGets& setGets) {
+      // Prepare a flat matrix of all interferences. This is fast to insert into.
+      auto numLocals = parent.numLocals;
+      indexInterferences.resize(numLocals * numLocals);
+      std::fill(indexInterferences.begin(), indexInterferences.end(), false);
+
       // Equivalences let us see if two sets that have overlapping lifetimes are actually
       // in conflict.
       Equivalences equivalences(parent, getSets);
@@ -395,7 +399,9 @@ protected:
             a->index != b->index &&
             !equivalences.areEquivalent(a, b)) {
 //std::cout << "add int " << a->index << " : " << b->index << '\n';
-          setInterferences.insert(a, b);
+          // Don't bother adding both ways - we'll mirror it later
+          // TODO: prefer smaller a, for better memory locality?
+          indexInterferences[(numLocals * a->index) + b->index] = true;
         }
       };
 
@@ -497,20 +503,6 @@ protected:
       // Note that we don't need any special-casing of params, since we assume the implicit
       // sets have been instrumented with InstrumentExplicitSets anyhow
 
-      // We computed the interferences between sets. Use that to compute it between local
-      // indexes. TODO: a flat matrix?
-      for (auto& pair : setInterferences.data) {
-        auto* a = pair.first;
-        auto& bs = pair.second;
-        for (auto* b : bs) {
-          indexInterferences[a->index].insert(b->index);
-          indexInterferences[b->index].insert(a->index);
-        }
-      }
-#if CFG_DEBUG
-      std::cerr << "  step5.3\n";
-#endif
-
       // Used zero inits interfere with params; this avoids us seeing a param is unused
       // and reusing that for a zero init (that could work, but we'd need an explicit zero
       // init, wasting space). There is no problem with them interfering with other zero
@@ -525,8 +517,18 @@ protected:
         assert(set && set->index == i);
         if (!setGets.getGetsFor(set).empty()) {
           for (Index j = 0; j < func->getNumParams(); j++) {
-            indexInterferences[i].insert(j);
-            indexInterferences[j].insert(i);
+            indexInterferences[(numLocals * i) + j] = true;
+          }
+        }
+      }
+#if CFG_DEBUG
+      std::cerr << "  step5.3\n";
+#endif
+      // Make sure the index interferences mirror each other.
+      for (Index i = 0; i < numLocals; i++) {
+        for (Index j = 0; j < numLocals; j++) {
+          if (indexInterferences[(numLocals * i) + j]) {
+            indexInterferences[(numLocals * j) + i] = true;
           }
         }
       }
@@ -535,10 +537,7 @@ protected:
 #endif
     }
 
-    std::map<Index, std::set<Index>> indexInterferences;
-
-  private:
-    SymmetricRelation<SetLocal*> setInterferences;
+    std::vector<bool> indexInterferences;
   };
 
   void applyIndices(std::vector<Index>& indices, Expression* root, GetSets& getSets, SetGets& setGets);
@@ -596,32 +595,36 @@ void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector
 void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector<Index>& indices, Index& removedCopies) {
   // mostly-simple greedy coloring
 #if CFG_DEBUG
-  std::cerr << "\npickIndicesFromOrder on " << getFunction()->name << '\n';
-  std::cerr << "order:\n";
-  for (auto i : order) std::cerr << i << ' ';
-  std::cerr << '\n';
-  std::cerr << "interferences:\n";
-  for (Index i = 0; i < numLocals; i++) {
-    std::cerr << i << ": ";
-    for (auto j : interferences.indexInterferences[i]) {
-      std::cerr << j << ' ';
-    }
+  {
+    std::cerr << "\npickIndicesFromOrder on " << getFunction()->name << '\n';
+    std::cerr << "order:\n";
+    for (auto i : order) std::cerr << i << ' ';
     std::cerr << '\n';
-  }
-  std::cerr << "copies:\n";
-  for (Index i = 0; i < numLocals; i++) {
-    std::cerr << i << ": ";
-    for (Index j = 0; j < numLocals; j++) {
-      auto c = copies.getCopies(i, j);
-      if (c > 0) {
-        std::cerr << j << ':' << c << ' ';
+    std::cerr << "interferences:\n";
+    for (Index i = 0; i < numLocals; i++) {
+      std::cerr << i << ": ";
+      for (Index j = 0; j < numLocals; j++) {
+        if (interferences.indexInterferences[(numLocals * i) + j]) {
+          std::cerr << j << ' ';
+        }
       }
+      std::cerr << '\n';
     }
-    std::cerr << '\n';
-  }
-  std::cerr << "total copies:\n";
-  for (Index i = 0; i < numLocals; i++) {
-    std::cerr << " $" << i << ": " << copies.getTotalCopies()[i] << '\n';
+    std::cerr << "copies:\n";
+    for (Index i = 0; i < numLocals; i++) {
+      std::cerr << i << ": ";
+      for (Index j = 0; j < numLocals; j++) {
+        auto c = copies.getCopies(i, j);
+        if (c > 0) {
+          std::cerr << j << ':' << c << ' ';
+        }
+      }
+      std::cerr << '\n';
+    }
+    std::cerr << "total copies:\n";
+    for (Index i = 0; i < numLocals; i++) {
+      std::cerr << " $" << i << ": " << copies.getTotalCopies()[i] << '\n';
+    }
   }
 #endif
   // TODO: take into account distribution (99-1 is better than 50-50 with two registers, for gzip)
@@ -644,7 +647,7 @@ void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector
     indices[i] = i;
     types[i] = getFunction()->getLocalType(i);
     for (Index j = numParams; j < numLocals; j++) {
-      newInterferences[numLocals * i + j] = interferences.indexInterferences[i].count(j);
+      newInterferences[numLocals * i + j] = interferences.indexInterferences[numLocals * i + j];
       newCopies[numLocals * i + j] = copies.getCopies(i, j);
     }
     nextFree++;
@@ -679,7 +682,7 @@ void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector
     // merge new interferences and copies for the new index
     for (Index k = i + 1; k < numLocals; k++) {
       auto j = order[k]; // go in the order, we only need to update for those we will see later
-      newInterferences[found * numLocals + j] = newInterferences[found * numLocals + j] | interferences.indexInterferences[actual].count(j);
+      newInterferences[found * numLocals + j] = newInterferences[found * numLocals + j] | interferences.indexInterferences[numLocals * actual + j];
       newCopies[found * numLocals + j] += copies.getCopies(actual, j);
     }
   }
