@@ -394,30 +394,61 @@ protected:
         if (a != b &&
             a->index != b->index &&
             !equivalences.areEquivalent(a, b)) {
+//std::cout << "add int " << a->index << " : " << b->index << '\n';
           setInterferences.insert(a, b);
         }
       };
 
-      auto interfereBetweenAll = [&](Liveness::SetSet& set) {
-        for (auto* a : set) {
-          for (auto* b : set) {
-            if (b >= a) break;
-            maybeInterfere(a, b);
+//std::cout << "entry is " << parent.entry << '\n';
+      for (auto* block : parent.liveBlocks) {
+//std::cout << "a block " << block << " with outs ";
+//for (auto* b : block->out) std::cout << b << ' ';
+//std::cout << "\n at the end: ";
+        auto live = block->endSets;
+//for (auto* l : live) std::cout << l->index << ' ';
+//std::cout << '\n';
+        // Everything coming in might interfere for the first time here, if they
+        // come from different blocks.
+        auto& out = block->out;
+        if (out.size() > 1) {
+          bool hasDifference = false;
+          auto* first = out[0];
+          for (Index i = 1; i < out.size(); i++) {
+            auto* other = out[i];
+            if (other->startSets != first->startSets) {
+              hasDifference = true;
+              break;
+            }
+          }
+          if (hasDifference) {
+            // TODO: we already know about interferences in each arriving block,
+            //       so can compare only between them. for 2 blocks, that's easy at least.
+            for (auto* a : live) {
+              for (auto* b : live) {
+                if (b >= a) break;
+                maybeInterfere(a, b);
+              }
+            }
+          } else {
+//std::cout << "  no difference\n";
+//for (auto* block : out) {
+//  std::cout << "    ";
+//  for (auto* set : block->startSets) {
+//    std::cout << set << " (" << set->index << ") ";
+//  }
+//  std::cout << '\n';
+//}
           }
         }
-      };
-
-      for (auto* block : parent.liveBlocks) {
-        // Everything coming in might interfere for the first time here, as they
-        // might come from a different block.
-        auto live = block->endSets;
-        interfereBetweenAll(live);
         // scan through the block itself
         auto& actions = block->actions;
         for (int i = int(actions.size()) - 1; i >= 0; i--) {
+//std::cout << " (at " << i << ")\n";
           auto& action = actions[i];
           if (auto* get = action.getGet()) {
+//std::cout << "  get: " << get->index << " now has live set(s)\n";
             // Potentially new live sets start here.
+            // TODO: check if sets are already live
             auto& sets = getSets.getSetsFor(get);
             for (auto* set : sets) {
               live.insert(set);
@@ -426,6 +457,7 @@ protected:
               }
             }
           } if (auto* set = action.getSet()) {
+//std::cout << "  set: " << set->index << " is now gone\n";
             // This set is no longer live before this.
             live.erase(set);
 #ifndef NDEBUG
@@ -436,6 +468,14 @@ protected:
 #endif
           }
         }
+#if CFG_DEBUG >= 2
+        std::cout << "at the start: ";
+        for (auto* l : live) std::cout << l->index << ' ';
+        std::cout << "\nand startSets: ";
+        for (auto* l : block->startSets) std::cout << l->index << ' ';
+        std::cout << '\n';
+#endif
+        assert(live == block->startSets);
       }
 #if CFG_DEBUG
       std::cerr << "  step5.2\n";
