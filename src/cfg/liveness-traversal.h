@@ -21,6 +21,7 @@
 #ifndef liveness_traversal_h
 #define liveness_traversal_h
 
+#include "support/one_time_work_list.h"
 #include "support/sorted_vector.h"
 #include "wasm.h"
 #include "wasm-builder.h"
@@ -254,29 +255,28 @@ private:
     for (auto* block : liveBlocks) {
       for (auto& action : block->actions) {
         if (auto* set = action.getSet()) {
+          auto index = set->index;
           if (block->endSets.has(set)) {
             // This set is live at the end of the block - do the flow.
-            std::set<BasicBlock*> queue;
+            OneTimeWorkList<BasicBlock*> queue;
             for (auto* succ : block->out) {
-              queue.insert(succ);
+              queue.push(succ);
             }
-            while (queue.size() > 0) {
-              auto iter = queue.begin();
-              auto* block = *iter;
-              queue.erase(iter);
+            while (!queue.empty()) {
+              auto* block = queue.pop();
               // If the index is no longer live (may have flowed to just one of the children), stop.
-              if (!block->startIndexes.has(set->index)) continue;
+              if (!block->startIndexes.has(index)) continue;
               // If already seen here, stop.
               if (block->startSets.has(set)) continue;
               block->startSets.insert(set);
               // If it doesn't flow through, stop.
-              if (indexesSetInBlocks[block].has(set->index)) continue;
+              if (indexesSetInBlocks[block].has(index)) continue;
               // If the index is no longer live at the end (maybe all the gets appeared), stop.
-              if (!block->endIndexes.has(set->index)) continue;
+              if (!block->endIndexes.has(index)) continue;
               // It made it all the way through!
               block->endSets.insert(set);
               for (auto* succ : block->out) {
-                queue.insert(succ);
+                queue.push(succ);
               }
             }
           }

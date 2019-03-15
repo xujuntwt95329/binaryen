@@ -57,7 +57,6 @@
 #include "cfg/liveness-traversal.h"
 #include "wasm-builder.h"
 #include "support/learning.h"
-#include "support/one_time_work_list.h"
 #include "support/permutations.h"
 #include "support/symmetric.h"
 #ifdef CFG_PROFILE
