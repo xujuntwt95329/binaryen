@@ -51,7 +51,7 @@ namespace wasm {
 // Information for a function
 struct DAEFunctionInfo {
   // The unused parameters, if any.
-  SortedVector unusedParams;
+  SortedVector<Index> unusedParams;
   // Maps a function name to the calls going to it.
   std::unordered_map<Name, std::vector<Call*>> calls;
   // Map of all calls that are dropped, to their drops' locations (so that
@@ -143,16 +143,16 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
     // Flow the incoming parameter values, see if they reach a read.
     // Once we've seen a parameter at a block, we need never consider it there
     // again.
-    std::unordered_map<BasicBlock*, SortedVector> seenBlockIndexes;
+    std::unordered_map<BasicBlock*, SortedVector<Index>> seenBlockIndexes;
     // Start with all the incoming parameters.
-    SortedVector initial;
+    SortedVector<Index> initial;
     for (Index i = 0; i < numParams; i++) {
       initial.push_back(i);
     }
     // The used params, which we now compute.
     std::unordered_set<Index> usedParams;
     // An item of work is a block plus the values arriving there.
-    typedef std::pair<BasicBlock*, SortedVector> Item;
+    typedef std::pair<BasicBlock*, SortedVector<Index>> Item;
     std::vector<Item> work;
     work.emplace_back(entry, initial);
     while (!work.empty()) {
@@ -174,7 +174,7 @@ struct DAEScanner : public WalkerPass<CFGWalker<DAEScanner, Visitor<DAEScanner>,
         continue; // nothing more to flow
       }
       auto& localUses = block->localUses;
-      SortedVector remainingIndexes;
+      SortedVector<Index> remainingIndexes;
       for (auto i : indexes) {
         auto iter = localUses.find(i);
         if (iter != localUses.end()) {

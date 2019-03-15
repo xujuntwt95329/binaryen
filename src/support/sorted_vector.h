@@ -25,14 +25,15 @@
 
 namespace wasm {
 
-struct SortedVector : public std::vector<Index> {
+template<typename T>
+struct SortedVector : public std::vector<T> {
   SortedVector() = default;
 
   SortedVector merge(const SortedVector& other) const {
     SortedVector ret;
-    ret.resize(size() + other.size());
-    Index i = 0, j = 0, t = 0;
-    while (i < size() && j < other.size()) {
+    ret.resize(this->size() + other.size());
+    size_t i = 0, j = 0, t = 0;
+    while (i < this->size() && j < other.size()) {
       auto left = (*this)[i];
       auto right = other[j];
       if (left < right) {
@@ -47,7 +48,7 @@ struct SortedVector : public std::vector<Index> {
         j++;
       }
     }
-    while (i < size()) {
+    while (i < this->size()) {
       ret[t++] = (*this)[i];
       i++;
     }
@@ -59,48 +60,48 @@ struct SortedVector : public std::vector<Index> {
     return ret;
   }
 
-  void insert(Index x) {
-    auto it = std::lower_bound(begin(), end(), x);
-    if (it == end()) push_back(x);
+  void insert(T x) {
+    auto it = std::lower_bound(this->begin(), this->end(), x);
+    if (it == this->end()) this->push_back(x);
     else if (*it > x) {
-      Index i = it - begin();
-      resize(size() + 1);
-      std::move_backward(begin() + i, begin() + size() - 1, end());
+      size_t i = it - this->begin();
+      this->resize(this->size() + 1);
+      std::move_backward(this->begin() + i, this->begin() + this->size() - 1, this->end());
       (*this)[i] = x;
     }
   }
 
-  bool erase(Index x) {
-    auto it = std::lower_bound(begin(), end(), x);
-    if (it != end() && *it == x) {
-      std::move(it + 1, end(), it);
-      resize(size() - 1);
+  bool erase(T x) {
+    auto it = std::lower_bound(this->begin(), this->end(), x);
+    if (it != this->end() && *it == x) {
+      std::move(it + 1, this->end(), it);
+      this->resize(this->size() - 1);
       return true;
     }
     return false;
   }
 
-  bool has(Index x) {
-    auto it = std::lower_bound(begin(), end(), x);
-    return it != end() && *it == x;
+  bool has(T x) {
+    auto it = std::lower_bound(this->begin(), this->end(), x);
+    return it != this->end() && *it == x;
   }
 
-  template<typename T>
-  SortedVector& filter(T keep) {
+  template<typename U>
+  SortedVector& filter(U keep) {
     size_t skip = 0;
-    for (size_t i = 0; i < size(); i++) {
+    for (size_t i = 0; i < this->size(); i++) {
       if (keep((*this)[i])) {
         (*this)[i - skip] = (*this)[i];
       } else {
         skip++;
       }
     }
-    resize(size() - skip);
+    this->resize(this->size() - skip);
     return *this;
   }
 
   void verify() const {
-    for (Index i = 1; i < size(); i++) {
+    for (size_t i = 1; i < this->size(); i++) {
       assert((*this)[i - 1] < (*this)[i]);
     }
   }

@@ -100,10 +100,10 @@ struct Liveness {
   // may be a great many potential elements but actual sets
   // may be fairly small. Specifically, we use a sorted
   // vector.
-  using IndexSet = SortedVector;
+  using IndexSet = SortedVector<Index>;
 
   // A set of SetLocals.
-  using SetSet = std::set<SetLocal*>;
+  using SetSet = SortedVector<SetLocal*>;
 
   std::vector<LivenessAction> actions; // actions occurring in this block
 
@@ -254,7 +254,7 @@ private:
     for (auto* block : liveBlocks) {
       for (auto& action : block->actions) {
         if (auto* set = action.getSet()) {
-          if (block->endSets.count(set)) {
+          if (block->endSets.has(set)) {
             // This set is live at the end of the block - do the flow.
             std::set<BasicBlock*> queue;
             for (auto* succ : block->out) {
@@ -265,7 +265,7 @@ private:
               auto* block = *iter;
               queue.erase(iter);
               // If already seen here, stop.
-              if (block->startSets.count(set)) continue;
+              if (block->startSets.has(set)) continue;
               block->startSets.insert(set);
               // If it doesn't flow through, stop.
               if (indexesSetInBlocks[block].has(set->index)) continue;

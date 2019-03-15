@@ -1,3 +1,4 @@
+#define CFG_DEBUG 1
 /*
  * Copyright 2016 WebAssembly Community Group participants
  *
@@ -96,7 +97,9 @@ protected:
         for (auto& action : block->actions) {
           if (auto* set = action.getSet()) {
             // Possibly overwrite a previous set.
-            indexSets[action.index] = { set };
+            auto& sets = indexSets[action.index];
+            sets.clear();
+            sets.insert(set);
           } else if (auto* get = action.getGet()) {
             getSetses[get] = indexSets[action.index];
           }
@@ -357,6 +360,9 @@ protected:
       // Equivalences let us see if two sets that have overlapping lifetimes are actually
       // in conflict.
       Equivalences equivalences(parent, getSets);
+#if CFG_DEBUG
+      std::cerr << "  step5.1\n";
+#endif
 
       // TODO: perhaps leave this checking to a cleanup at the end?
       // Add an interference, if two sets can in fact interfere
@@ -409,6 +415,9 @@ protected:
           }
         }
       }
+#if CFG_DEBUG
+      std::cerr << "  step5.2\n";
+#endif
       // Note that we don't need any special-casing of params, since we assume the implicit
       // sets have been instrumented with InstrumentExplicitSets anyhow
 
@@ -416,10 +425,15 @@ protected:
       // indexes. TODO: a flat matrix?
       for (auto& pair : setInterferences.data) {
         auto* a = pair.first;
-        auto* b = pair.second;
-        indexInterferences[a->index].insert(b->index);
-        indexInterferences[b->index].insert(a->index);
+        auto& bs = pair.second;
+        for (auto* b : bs) {
+          indexInterferences[a->index].insert(b->index);
+          indexInterferences[b->index].insert(a->index);
+        }
       }
+#if CFG_DEBUG
+      std::cerr << "  step5.3\n";
+#endif
 
       // Used zero inits interfere with params; this avoids us seeing a param is unused
       // and reusing that for a zero init (that could work, but we'd need an explicit zero
@@ -440,6 +454,9 @@ protected:
           }
         }
       }
+#if CFG_DEBUG
+      std::cerr << "  step5.4\n";
+#endif
     }
 
     std::map<Index, std::set<Index>> indexInterferences;
@@ -455,16 +472,40 @@ protected:
 };
 
 void CoalesceLocals::doWalkFunction(Function* func) {
+#if CFG_DEBUG
+  std::cerr << "CoalesceLocals: " << func->name << '\n';
+#endif
   numLocals = func->getNumLocals();
   InstrumentExplicitSets instrumenter(func, getModule());
+#if CFG_DEBUG
+  std::cerr << " step1\n";
+#endif
   super::doWalkFunction(func);
+#if CFG_DEBUG
+  std::cerr << " step2\n";
+#endif
   copies.compute(*this);
+#if CFG_DEBUG
+  std::cerr << " step3\n";
+#endif
   GetSets getSets(*this);
+#if CFG_DEBUG
+  std::cerr << " step4\n";
+#endif
   SetGets setGets(getSets);
+#if CFG_DEBUG
+  std::cerr << " step5\n";
+#endif
   interferences.compute(*this, getSets, setGets);
+#if CFG_DEBUG
+  std::cerr << " step6\n";
+#endif
   // pick new indices
   std::vector<Index> indices;
   pickIndices(indices);
+#if CFG_DEBUG
+  std::cerr << " step7\n";
+#endif
   // apply indices
   applyIndices(indices, func->body, getSets, setGets);
 }
@@ -480,7 +521,6 @@ void CoalesceLocals::pickIndicesFromOrder(std::vector<Index>& order, std::vector
   // mostly-simple greedy coloring
 #if CFG_DEBUG
   std::cerr << "\npickIndicesFromOrder on " << getFunction()->name << '\n';
-  std::cerr << getFunction()->body << '\n';
   std::cerr << "order:\n";
   for (auto i : order) std::cerr << i << ' ';
   std::cerr << '\n';

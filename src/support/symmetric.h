@@ -43,19 +43,30 @@ template<typename T>
 class SymmetricRelation {
 public:
   void insert(T a, T b) {
-    data.insert(SymmetricPair<T>(a, b));
+    canonicalize(a, b);
+    data[a].insert(b);
   }
 
   void erase(T a, T b) {
-    data.erase(SymmetricPair<T>(a, b));
+    canonicalize(a, b);
+    data[a].erase(b);
   }
 
   bool has(T a, T b) {
-    return data.find(SymmetricPair<T>(a, b)) != data.end();
+    canonicalize(a, b);
+    auto iter = data.find(a);
+    return iter != data.end() &&
+           iter->second.count(b);
   }
 
-  // We store only the canonicalized form of each pair, to save half the memory.
-  std::set<SymmetricPair<T>> data;
+  // We store only the canonicalized form here.
+  std::map<T, std::set<T>> data;
+
+  void canonicalize(T& a, T&b) {
+    if (a > b) {
+      std::swap(a, b);
+    }
+  }
 };
 
 template<typename T, typename U>
