@@ -256,6 +256,12 @@ protected:
       return getKnownClass(a) == getKnownClass(b);
     }
 
+    Index getKnownClass(SetLocal* set) {
+      auto ret = getClass(set);
+      assert(ret != 0);
+      return ret;
+    }
+
   private:
     GetSets& getSets;
 
@@ -269,12 +275,6 @@ protected:
         return 0;
       }
       auto ret = iter->second;
-      assert(ret != 0);
-      return ret;
-    }
-
-    Index getKnownClass(SetLocal* set) {
-      auto ret = getClass(set);
       assert(ret != 0);
       return ret;
     }
@@ -379,29 +379,40 @@ protected:
     void compute(CoalesceLocals& parent, GetSets& getSets, SetGets& setGets) {
       // Prepare a flat matrix of all interferences. This is fast to insert into.
       auto numLocals = parent.numLocals;
-      indexInterferences.resize(numLocals * numLocals);
-      std::fill(indexInterferences.begin(), indexInterferences.end(), false);
 
       // Equivalences let us see if two sets that have overlapping lifetimes are actually
       // in conflict.
       Equivalences equivalences(parent, getSets);
+
+      // For efficiency, identify each set by an index. We can then do all our work on those
+      // indexes, which are compact and also avoid some pointer chasing.
+      SetIndexer indexer(parent);
+      auto numSets = indexer.size();
+      // Reuse startIndexes/endIndexes vectors on the blocks, which we no longer need anyhow.
+      // Then all the logic below can just use those.
+      for (auto* block : parent.liveBlocks) {
+        block->startIndexes.clear();
+        for (auto* set : block->startSets) {
+          block->startIndexes.insert(indexer.setToIndex[set]);
+        }
+        block->endIndexes.clear();
+        for (auto* set : block->endSets) {
+          block->endIndexes.insert(indexer.setToIndex[set]);
+        }
+      }
+      // Compute interferences on a flat matrix for efficiency.
+      std::vector<bool> setIndexInterferences;
+      setIndexInterferences.resize(numSets * numSets);
+      std::fill(setIndexInterferences.begin(), setIndexInterferences.end(), false);
+
 #if CFG_DEBUG
       std::cerr << "  step5.1\n";
 #endif
 
-      // TODO: perhaps leave this checking to a cleanup at the end?
-      // Add an interference, if two sets can in fact interfere
-      auto maybeInterfere = [&](SetLocal* a, SetLocal* b) {
-        // 1. A set cannot intefere with itself.
-        // 2. If a set has the same local index, it cannot interfere - we have proof!
-        // 3. If we calculated the values are equivalent, they cannot interfere.
-        if (a != b &&
-            a->index != b->index &&
-            !equivalences.areEquivalent(a, b)) {
-//std::cout << "add int " << a->index << " : " << b->index << '\n';
-          // Don't bother adding both ways - we'll mirror it later
-          indexInterferences[(numLocals * a->index) + b->index] = true;
-        }
+      // Add an interference. We will check later (once) if it is actually real.
+      auto interfere = [&](Index a, Index b) {
+        // Don't bother adding both ways - we'll mirror it later
+        setIndexInterferences[(numSets * a) + b] = true;
       };
 
 //std::cout << "entry is " << parent.entry << '\n';
@@ -409,7 +420,7 @@ protected:
 //std::cout << "a block " << block << " with outs ";
 //for (auto* b : block->out) std::cout << b << ' ';
 //std::cout << "\n at the end: ";
-        auto live = block->endSets;
+        auto live = block->endIndexes;
 //for (auto* l : live) std::cout << l->index << ' ';
 //std::cout << '\n';
         // Everything coming in might interfere for the first time here, if they
@@ -420,7 +431,7 @@ protected:
           auto* first = out[0];
           for (Index i = 1; i < out.size(); i++) {
             auto* other = out[i];
-            if (other->startSets != first->startSets) {
+            if (other->startIndexes != first->startIndexes) {
               hasDifference = true;
               break;
             }
@@ -432,19 +443,19 @@ protected:
             if (out.size() == 2) {
               auto* first = out[0];
               auto* second = out[1];
-              if (first->startSets.size() > second->startSets.size()) {
+              if (first->startIndexes.size() > second->startIndexes.size()) {
                 std::swap(first, second);
               }
-              for (auto* a : first->startSets) {
-                for (auto* b : second->startSets) {
-                  maybeInterfere(a, b); // 4 secs without this
+              for (auto a : first->startIndexes) {
+                for (auto b : second->startIndexes) {
+                  interfere(a, b); // 4 secs without this
                 }
               }
             } else {
-              for (auto* a : live) {
-                for (auto* b : live) {
+              for (auto a : live) {
+                for (auto b : live) {
                   if (b >= a) break;
-                  maybeInterfere(a, b); // 8 secs without this
+                  interfere(a, b); // 8 secs without this
                 }
               }
             }
@@ -470,37 +481,60 @@ protected:
             // TODO: check if sets are already live
             auto& sets = getSets.getSetsFor(get);
             for (auto* set : sets) {
-              live.insert(set);
-              for (auto* otherSet : live) {
-                maybeInterfere(set, otherSet);
+              auto index = indexer.setToIndex[set];
+              live.insert(index);
+              for (auto other : live) {
+                interfere(index, other);
               }
             }
           } if (auto* set = action.getSet()) {
 //std::cout << "  set: " << set->index << " is now gone\n";
             // This set is no longer live before this.
-            live.erase(set);
-#ifndef NDEBUG
-            // No other set of that index can be live now.
-            for (auto* otherSet : live) {
-              assert(otherSet->index != set->index);
-            }
-#endif
+            auto index = indexer.setToIndex[set];
+            assert(live.has(index));
+            live.erase(index);
           }
         }
 #if CFG_DEBUG >= 2
         std::cout << "at the start: ";
         for (auto* l : live) std::cout << l->index << ' ';
         std::cout << "\nand startSets: ";
-        for (auto* l : block->startSets) std::cout << l->index << ' ';
+        for (auto* l : block->startIndexes) std::cout << l->index << ' ';
         std::cout << '\n';
 #endif
-        assert(live == block->startSets);
+        assert(live == block->startIndexes);
       }
 #if CFG_DEBUG
       std::cerr << "  step5.2\n";
 #endif
       // Note that we don't need any special-casing of params, since we assume the implicit
       // sets have been instrumented with InstrumentExplicitSets anyhow
+
+      // Translate set index interferences into index interferences. While doing so we
+      // check which are actually real.
+      indexInterferences.resize(numLocals * numLocals);
+      std::fill(indexInterferences.begin(), indexInterferences.end(), false);
+
+      // Create a mapping of set indexes to the equivalence classes.
+      std::vector<Index> setIndexEquivalenceClasses;
+      for (auto* set : indexer.indexToSet) {
+        setIndexEquivalenceClasses.push_back(equivalences.getKnownClass(set));
+      }
+      for (Index i = 0; i < numSets; i++) {
+        for (Index j = 0; j < numSets; j++) {
+          if (setIndexInterferences[i * numSets + j]) {
+            auto* iSet = indexer.indexToSet[i];
+            auto* jSet = indexer.indexToSet[j];
+            if (iSet != jSet &&                  // can't interfere with yourself
+                iSet->index != jSet->index &&    // having the same original index is proof they don't interfere
+                setIndexEquivalenceClasses[i] != // equivalent values do not interfere
+                setIndexEquivalenceClasses[j]) {
+              indexInterferences[(numLocals * i) + j] = true;
+              indexInterferences[(numLocals * j) + i] = true;
+            }
+          }
+        }
+      }
 
       // Used zero inits interfere with params; this avoids us seeing a param is unused
       // and reusing that for a zero init (that could work, but we'd need an explicit zero
@@ -517,20 +551,13 @@ protected:
         if (!setGets.getGetsFor(set).empty()) {
           for (Index j = 0; j < func->getNumParams(); j++) {
             indexInterferences[(numLocals * i) + j] = true;
+            indexInterferences[(numLocals * j) + i] = true;
           }
         }
       }
 #if CFG_DEBUG
       std::cerr << "  step5.3\n";
 #endif
-      // Make sure the index interferences mirror each other.
-      for (Index i = 0; i < numLocals; i++) {
-        for (Index j = 0; j < numLocals; j++) {
-          if (indexInterferences[(numLocals * i) + j]) {
-            indexInterferences[(numLocals * j) + i] = true;
-          }
-        }
-      }
 #if CFG_DEBUG
       std::cerr << "  step5.4\n";
 #endif
