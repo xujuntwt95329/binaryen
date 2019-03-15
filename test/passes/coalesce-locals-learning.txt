@@ -154,11 +154,12 @@
  (func $multi (; 13 ;) (type $2)
   (local $0 i32)
   (local $1 i32)
-  (drop
-   (local.get $0)
-  )
+  (local $2 i32)
   (drop
    (local.get $1)
+  )
+  (drop
+   (local.get $2)
   )
  )
  (func $if-else (; 14 ;) (type $2)
@@ -336,6 +337,7 @@
  )
  (func $if4 (; 23 ;) (type $2)
   (local $0 i32)
+  (local $1 i32)
   (if
    (i32.const 0)
    (block $block1
@@ -345,13 +347,13 @@
     (drop
      (local.get $0)
     )
-    (local.set $0
+    (local.set $1
      (i32.const 1)
     )
    )
   )
   (drop
-   (local.get $0)
+   (local.get $1)
   )
  )
  (func $if5 (; 24 ;) (type $2)
@@ -459,6 +461,7 @@
   (local $0 i32)
   (local $1 i32)
   (local $2 i32)
+  (local $3 i32)
   (block $switch$def
    (block $switch-case$1
     (block $switch-case$2
@@ -470,15 +473,15 @@
      )
     )
     (drop
-     (local.get $0)
+     (local.get $1)
     )
    )
    (drop
-    (local.get $1)
+    (local.get $2)
    )
   )
   (drop
-   (local.get $2)
+   (local.get $3)
   )
  )
  (func $greedy-can-be-happy (; 32 ;) (type $2)

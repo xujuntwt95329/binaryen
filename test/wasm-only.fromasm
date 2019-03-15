@@ -519,9 +519,11 @@
   )
  )
  (func $ifValue32 (; 20 ;) (; has Stack IR ;) (param $0 i32) (param $1 i32) (result i32)
-  (call $ifValue32
-   (local.get $0)
-   (local.get $1)
+  (local.tee $0
+   (call $ifValue32
+    (local.get $0)
+    (local.get $1)
+   )
   )
  )
  (func $unreachable_leftovers (; 21 ;) (; has Stack IR ;)

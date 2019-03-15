@@ -113,8 +113,6 @@ protected:
     std::map<GetLocal*, Liveness::SetSet> getSetses;
   };
 
-  void applyIndices(std::vector<Index>& indices, Expression* root, GetSets& getSets);
-
   // Calculate the gets each set can reach.
   // TODO: verify against LocalGraph!
   class SetGets {
@@ -355,7 +353,7 @@ protected:
   // Interferences between sets. We assume sets of the same indexes do not interfere.
   class Interferences {
   public:
-    void compute(CoalesceLocals& parent, GetSets& getSets) {
+    void compute(CoalesceLocals& parent, GetSets& getSets, SetGets& setGets) {
       // Equivalences let us see if two sets that have overlapping lifetimes are actually
       // in conflict.
       Equivalences equivalences(parent, getSets);
@@ -423,14 +421,23 @@ protected:
         indexInterferences[b->index].insert(a->index);
       }
 
-      // The zero inits interfere with all params; this avoids us seeing a param is unused
-      // and reusing that for a zero init. That could work, but we'd need an explicit zero
-      // init, wasting space.
+      // Used zero inits interfere with params; this avoids us seeing a param is unused
+      // and reusing that for a zero init (that could work, but we'd need an explicit zero
+      // init, wasting space). There is no problem with them interfering with other zero
+      // inits, of course.
+      // First, find the zero inits - we ran InstrumentExplicitSets so there are explicit
+      // sets for them now.
+      auto* entry = parent.entry;
       auto* func = parent.getFunction();
-      for (Index i = 0; i < func->getNumParams(); i++) {
-        for (Index j = func->getNumParams(); j < func->getNumLocals(); j++) {
-          indexInterferences[i].insert(j);
-          indexInterferences[j].insert(i);
+      assert(entry->actions.size() >= func->getNumLocals());
+      for (Index i = func->getNumParams(); i < func->getNumLocals(); i++) {
+        auto* set = entry->actions[i].getSet();
+        assert(set && set->index == i);
+        if (!setGets.getGetsFor(set).empty()) {
+          for (Index j = 0; j < func->getNumLocals(); j++) {
+            indexInterferences[i].insert(j);
+            indexInterferences[j].insert(i);
+          }
         }
       }
     }
@@ -441,6 +448,8 @@ protected:
     SymmetricRelation<SetLocal*> setInterferences;
   };
 
+  void applyIndices(std::vector<Index>& indices, Expression* root, GetSets& getSets, SetGets& setGets);
+
   Copies copies;
   Interferences interferences;
 };
@@ -449,14 +458,15 @@ void CoalesceLocals::doWalkFunction(Function* func) {
   numLocals = func->getNumLocals();
   InstrumentExplicitSets instrumenter(func, getModule());
   super::doWalkFunction(func);
-  GetSets getSets(*this);
   copies.compute(*this);
-  interferences.compute(*this, getSets);
+  GetSets getSets(*this);
+  SetGets setGets(getSets);
+  interferences.compute(*this, getSets, setGets);
   // pick new indices
   std::vector<Index> indices;
   pickIndices(indices);
   // apply indices
-  applyIndices(indices, func->body, getSets);
+  applyIndices(indices, func->body, getSets, setGets);
 }
 
 // Indices decision making
@@ -608,8 +618,7 @@ void CoalesceLocals::pickIndices(std::vector<Index>& indices) {
   }
 }
 
-void CoalesceLocals::applyIndices(std::vector<Index>& indices, Expression* root, GetSets& getSets) {
-  SetGets setGets(getSets);
+void CoalesceLocals::applyIndices(std::vector<Index>& indices, Expression* root, GetSets& getSets, SetGets& setGets) {
   assert(indices.size() == numLocals);
   for (auto& curr : basicBlocks) {
     auto& actions = curr->actions;
