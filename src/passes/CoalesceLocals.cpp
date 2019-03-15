@@ -434,7 +434,7 @@ protected:
         auto* set = entry->actions[i].getSet();
         assert(set && set->index == i);
         if (!setGets.getGetsFor(set).empty()) {
-          for (Index j = 0; j < func->getNumLocals(); j++) {
+          for (Index j = 0; j < func->getNumParams(); j++) {
             indexInterferences[i].insert(j);
             indexInterferences[j].insert(i);
           }

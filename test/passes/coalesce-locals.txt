@@ -162,12 +162,11 @@
  (func $multi (; 15 ;) (type $2)
   (local $0 i32)
   (local $1 i32)
-  (local $2 i32)
   (drop
-   (local.get $1)
+   (local.get $0)
   )
   (drop
-   (local.get $2)
+   (local.get $1)
   )
  )
  (func $if-else (; 16 ;) (type $2)
@@ -345,7 +344,6 @@
  )
  (func $if4 (; 25 ;) (type $2)
   (local $0 i32)
-  (local $1 i32)
   (if
    (i32.const 0)
    (block $block1
@@ -355,13 +353,13 @@
     (drop
      (local.get $0)
     )
-    (local.set $1
+    (local.set $0
      (i32.const 1)
     )
    )
   )
   (drop
-   (local.get $1)
+   (local.get $0)
   )
  )
  (func $if5 (; 26 ;) (type $2)
@@ -467,7 +465,6 @@
   (local $0 i32)
   (local $1 i32)
   (local $2 i32)
-  (local $3 i32)
   (block $switch$def
    (block $switch-case$1
     (block $switch-case$2
@@ -479,15 +476,15 @@
      )
     )
     (drop
-     (local.get $1)
+     (local.get $0)
     )
    )
    (drop
-    (local.get $2)
+    (local.get $1)
    )
   )
   (drop
-   (local.get $3)
+   (local.get $2)
   )
  )
  (func $greedy-can-be-happy (; 34 ;) (type $2)
@@ -1071,9 +1068,8 @@
  )
  (func $if-copy4 (; 46 ;) (type $2)
   (local $0 i32)
-  (local $1 i32)
   (loop $top
-   (local.set $1
+   (local.set $0
     (if (result i32)
      (i32.const 1)
      (unreachable)
@@ -1081,7 +1077,7 @@
     )
    )
    (drop
-    (local.get $1)
+    (local.get $0)
    )
    (drop
     (local.get $0)
@@ -1161,7 +1157,6 @@
  )
  (func $pick (; 52 ;) (type $2)
   (local $0 i32)
-  (local $1 i32)
   (nop)
   (if
    (i32.const 1)
@@ -1174,7 +1169,6 @@
  )
  (func $pick-2 (; 53 ;) (type $2)
   (local $0 i32)
-  (local $1 i32)
   (nop)
   (if
    (i32.const 1)
@@ -1187,10 +1181,7 @@
  )
  (func $many (; 54 ;) (type $2)
   (local $0 i32)
-  (local $1 i32)
-  (local.set $0
-   (local.get $1)
-  )
+  (nop)
   (nop)
   (nop)
   (nop)
@@ -1200,35 +1191,27 @@
     (i32.const 1)
    )
   )
-  (local.set $1
-   (local.get $0)
-  )
+  (nop)
   (if
    (i32.const 1)
    (drop
     (i32.const 1)
    )
   )
-  (local.set $0
-   (local.get $1)
-  )
+  (nop)
   (nop)
   (nop)
   (local.set $0
    (i32.const 2)
   )
-  (local.set $1
-   (local.get $0)
-  )
+  (nop)
   (if
    (i32.const 1)
    (drop
     (i32.const 1)
    )
   )
-  (local.set $0
-   (local.get $1)
-  )
+  (nop)
   (nop)
   (nop)
   (drop
