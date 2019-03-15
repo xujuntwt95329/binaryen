@@ -1,3 +1,4 @@
+#include <wasm-printing.h>
 #define CFG_DEBUG 1
 /*
  * Copyright 2016 WebAssembly Community Group participants
@@ -91,6 +92,8 @@ protected:
       FindAll<SetLocal> allSets(parent.getFunction()->body);
       allSets.list.swap(indexToSet);
       for (Index i = 0; i < indexToSet.size(); i++) {
+std::cout << "set index: " << indexToSet[i] << " : " << i << '\n';
+
         setToIndex[indexToSet[i]] = i;
       }
     }
@@ -256,18 +259,6 @@ protected:
       return getKnownClass(a) == getKnownClass(b);
     }
 
-    Index getKnownClass(SetLocal* set) {
-      auto ret = getClass(set);
-      assert(ret != 0);
-      return ret;
-    }
-
-  private:
-    GetSets& getSets;
-
-    // There is a unique id for each class, which this maps sets to.
-    std::unordered_map<SetLocal*, Index> equivalenceClasses;
-
     // Return the class. 0 is the "null class" - we haven't calculated it yet.
     Index getClass(SetLocal* set) {
       auto iter = equivalenceClasses.find(set);
@@ -279,9 +270,21 @@ protected:
       return ret;
     }
 
+    Index getKnownClass(SetLocal* set) {
+      auto ret = getClass(set);
+      assert(ret != 0);
+      return ret;
+    }
+
     bool known(SetLocal* set) {
       return getClass(set) != 0;
     }
+
+  private:
+    GetSets& getSets;
+
+    // There is a unique id for each class, which this maps sets to.
+    std::unordered_map<SetLocal*, Index> equivalenceClasses;
 
     void compute(CoalesceLocals& parent) {
       // Set up the graph of direct connections. We'll use this to calculate the final
@@ -304,6 +307,7 @@ protected:
       for (auto* block : parent.liveBlocks) {
         for (auto& action : block->actions) {
           if (auto* set = action.getSet()) {
+std::cout << "see set " << set << '\n';
             auto node = make_unique<Node>();
             node->set = set;
             setNodes.emplace(set, node.get());
@@ -347,6 +351,8 @@ protected:
           auto* set = curr->set;
           assert(!known(set));
           equivalenceClasses[set] = currClass;
+std::cout << "set equiv " << set << " : " << currClass << '\n';
+
           for (auto* direct : curr->directs) {
             work.push(direct);
           }
@@ -377,7 +383,6 @@ protected:
   class Interferences {
   public:
     void compute(CoalesceLocals& parent, GetSets& getSets, SetGets& setGets) {
-      // Prepare a flat matrix of all interferences. This is fast to insert into.
       auto numLocals = parent.numLocals;
 
       // Equivalences let us see if two sets that have overlapping lifetimes are actually
@@ -385,7 +390,7 @@ protected:
       Equivalences equivalences(parent, getSets);
 
       // For efficiency, identify each set by an index. We can then do all our work on those
-      // indexes, which are compact and also avoid some pointer chasing.
+      // indexes, which are faster to handle.
       SetIndexer indexer(parent);
       auto numSets = indexer.size();
       // Reuse startIndexes/endIndexes vectors on the blocks, which we no longer need anyhow.
@@ -411,7 +416,7 @@ protected:
 
       // Add an interference. We will check later (once) if it is actually real.
       auto interfere = [&](Index a, Index b) {
-        // Don't bother adding both ways - we'll mirror it later
+        // Don't bother adding both ways - we'll mirror it later.
         setIndexInterferences[(numSets * a) + b] = true;
       };
 
@@ -482,16 +487,15 @@ protected:
             auto& sets = getSets.getSetsFor(get);
             for (auto* set : sets) {
               auto index = indexer.setToIndex[set];
-              live.insert(index);
               for (auto other : live) {
                 interfere(index, other);
               }
+              live.insert(index);
             }
           } if (auto* set = action.getSet()) {
 //std::cout << "  set: " << set->index << " is now gone\n";
             // This set is no longer live before this.
             auto index = indexer.setToIndex[set];
-            assert(live.has(index));
             live.erase(index);
           }
         }
@@ -499,7 +503,7 @@ protected:
         std::cout << "at the start: ";
         for (auto* l : live) std::cout << l->index << ' ';
         std::cout << "\nand startSets: ";
-        for (auto* l : block->startIndexes) std::cout << l->index << ' ';
+        for (auto l : block->startIndexes) std::cout << l->index << ' ';
         std::cout << '\n';
 #endif
         assert(live == block->startIndexes);
@@ -518,7 +522,10 @@ protected:
       // Create a mapping of set indexes to the equivalence classes.
       std::vector<Index> setIndexEquivalenceClasses;
       for (auto* set : indexer.indexToSet) {
-        setIndexEquivalenceClasses.push_back(equivalences.getKnownClass(set));
+std::cout << set << '\n';
+        // Note that the class may not be known, if the set is in unreachable code and we
+        // didn't compute one for it. In that case it will have 0, and it doesn't matter.
+        setIndexEquivalenceClasses.push_back(equivalences.getClass(set));
       }
       for (Index i = 0; i < numSets; i++) {
         for (Index j = 0; j < numSets; j++) {
