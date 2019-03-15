@@ -421,12 +421,26 @@ protected:
             }
           }
           if (hasDifference) {
-            // TODO: we already know about interferences in each arriving block,
-            //       so can compare only between them. for 2 blocks, that's easy at least.
-            for (auto* a : live) {
-              for (auto* b : live) {
-                if (b >= a) break;
-                maybeInterfere(a, b);
+            // We have already computed interferences in each other block separately, and just
+            // need to compute what is new here. For the common case of 2 other blocks, that's
+            // easy to benefit from.
+            if (out.size() == 2) {
+              auto* first = out[0];
+              auto* second = out[1];
+              if (first->startSets.size() > second->startSets.size()) {
+                std::swap(first, second);
+              }
+              for (auto* a : first->startSets) {
+                for (auto* b : second->startSets) {
+                  maybeInterfere(a, b);
+                }
+              }
+            } else {
+              for (auto* a : live) {
+                for (auto* b : live) {
+                  if (b >= a) break;
+                  maybeInterfere(a, b);
+                }
               }
             }
           } else {
