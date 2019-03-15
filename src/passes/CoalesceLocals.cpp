@@ -260,7 +260,7 @@ protected:
     GetSets& getSets;
 
     // There is a unique id for each class, which this maps sets to.
-    std::map<SetLocal*, Index> equivalenceClasses;
+    std::unordered_map<SetLocal*, Index> equivalenceClasses;
 
     // Return the class. 0 is the "null class" - we haven't calculated it yet.
     Index getClass(SetLocal* set) {
@@ -400,7 +400,6 @@ protected:
             !equivalences.areEquivalent(a, b)) {
 //std::cout << "add int " << a->index << " : " << b->index << '\n';
           // Don't bother adding both ways - we'll mirror it later
-          // TODO: prefer smaller a, for better memory locality?
           indexInterferences[(numLocals * a->index) + b->index] = true;
         }
       };
@@ -438,14 +437,14 @@ protected:
               }
               for (auto* a : first->startSets) {
                 for (auto* b : second->startSets) {
-                  maybeInterfere(a, b);
+                  maybeInterfere(a, b); // 4 secs without this
                 }
               }
             } else {
               for (auto* a : live) {
                 for (auto* b : live) {
                   if (b >= a) break;
-                  maybeInterfere(a, b);
+                  maybeInterfere(a, b); // 8 secs without this
                 }
               }
             }
