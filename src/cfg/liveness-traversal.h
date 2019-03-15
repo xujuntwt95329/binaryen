@@ -264,12 +264,14 @@ private:
               auto iter = queue.begin();
               auto* block = *iter;
               queue.erase(iter);
+              // If the index is no longer live (may have flowed to just one of the children), stop.
+              if (!block->startIndexes.has(set->index)) continue;
               // If already seen here, stop.
               if (block->startSets.has(set)) continue;
               block->startSets.insert(set);
               // If it doesn't flow through, stop.
               if (indexesSetInBlocks[block].has(set->index)) continue;
-              // If the index is no longer live, stop.
+              // If the index is no longer live at the end (maybe all the gets appeared), stop.
               if (!block->endIndexes.has(set->index)) continue;
               // It made it all the way through!
               block->endSets.insert(set);
