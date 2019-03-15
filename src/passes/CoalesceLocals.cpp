@@ -1,4 +1,4 @@
-#define CFG_DEBUG 1
+//#define CFG_DEBUG 1
 /*
  * Copyright 2016 WebAssembly Community Group participants
  *
@@ -49,6 +49,7 @@
 
 #include "wasm.h"
 #include "pass.h"
+#include "ir/find_all.h"
 #include "ir/local-utils.h"
 #include "ir/properties.h"
 #include "ir/utils.h"
@@ -82,6 +83,26 @@ protected:
   virtual void pickIndices(std::vector<Index>& indices); // returns a vector of oldIndex => newIndex
 
   // Utility components. These might be refactored out at some point if others need them.
+
+  // Create an 0..n indexing of all the sets in the function.
+  // TODO needed?
+  class SetIndexer {
+  public:
+    SetIndexer(CoalesceLocals& parent) {
+      FindAll<SetLocal> allSets(parent.getFunction()->body);
+      allSets.list.swap(indexToSet);
+      for (Index i = 0; i < indexToSet.size(); i++) {
+        setToIndex[indexToSet[i]] = i;
+      }
+    }
+
+    Index size() {
+      return indexToSet.size();
+    }
+
+    std::unordered_map<SetLocal*, Index> setToIndex;
+    std::vector<SetLocal*> indexToSet;
+  };
 
   // Calculate the sets that can reach each get.
   // TODO: verify against LocalGraph!
@@ -380,6 +401,7 @@ protected:
       auto interfereBetweenAll = [&](Liveness::SetSet& set) {
         for (auto* a : set) {
           for (auto* b : set) {
+            if (b >= a) break;
             maybeInterfere(a, b);
           }
         }
