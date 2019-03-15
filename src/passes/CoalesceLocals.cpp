@@ -1,5 +1,5 @@
+//#define CFG_DEBUG 1
 #include <wasm-printing.h>
-#define CFG_DEBUG 1
 /*
  * Copyright 2016 WebAssembly Community Group participants
  *
@@ -92,8 +92,6 @@ protected:
       FindAll<SetLocal> allSets(parent.getFunction()->body);
       allSets.list.swap(indexToSet);
       for (Index i = 0; i < indexToSet.size(); i++) {
-std::cout << "set index: " << indexToSet[i] << " : " << i << '\n';
-
         setToIndex[indexToSet[i]] = i;
       }
     }
@@ -307,7 +305,6 @@ std::cout << "set index: " << indexToSet[i] << " : " << i << '\n';
       for (auto* block : parent.liveBlocks) {
         for (auto& action : block->actions) {
           if (auto* set = action.getSet()) {
-std::cout << "see set " << set << '\n';
             auto node = make_unique<Node>();
             node->set = set;
             setNodes.emplace(set, node.get());
@@ -351,8 +348,6 @@ std::cout << "see set " << set << '\n';
           auto* set = curr->set;
           assert(!known(set));
           equivalenceClasses[set] = currClass;
-std::cout << "set equiv " << set << " : " << currClass << '\n';
-
           for (auto* direct : curr->directs) {
             work.push(direct);
           }
@@ -522,7 +517,6 @@ std::cout << "set equiv " << set << " : " << currClass << '\n';
       // Create a mapping of set indexes to the equivalence classes.
       std::vector<Index> setIndexEquivalenceClasses;
       for (auto* set : indexer.indexToSet) {
-std::cout << set << '\n';
         // Note that the class may not be known, if the set is in unreachable code and we
         // didn't compute one for it. In that case it will have 0, and it doesn't matter.
         setIndexEquivalenceClasses.push_back(equivalences.getClass(set));
@@ -536,8 +530,8 @@ std::cout << set << '\n';
                 iSet->index != jSet->index &&    // having the same original index is proof they don't interfere
                 setIndexEquivalenceClasses[i] != // equivalent values do not interfere
                 setIndexEquivalenceClasses[j]) {
-              indexInterferences[(numLocals * i) + j] = true;
-              indexInterferences[(numLocals * j) + i] = true;
+              indexInterferences[(numLocals * iSet->index) + jSet->index] = true;
+              indexInterferences[(numLocals * jSet->index) + iSet->index] = true;
             }
           }
         }
