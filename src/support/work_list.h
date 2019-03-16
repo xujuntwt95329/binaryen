@@ -14,19 +14,16 @@
  * limitations under the License.
  */
 
-//
-// A work list of items, where each item should only be handled once, but may
-// be attempted to be added more than once.
-//
-
-#ifndef wasm_support_one_time_work_list_h
-#define wasm_support_one_time_work_list_h
+#ifndef wasm_support_work_list_h
+#define wasm_support_work_list_h
 
 #include <queue>
 #include <unordered_map>
 
 namespace wasm {
 
+// A work list of items, where each item should only be handled once, but may
+// be attempted to be added more than once.
 template<typename T>
 struct OneTimeWorkList {
   std::vector<T> work;
@@ -55,6 +52,33 @@ struct OneTimeWorkList {
   }
 };
 
+// A work list of items, where each item may be handled multiple times. This class
+// avoids the overhead of having the item more than once in the work at the same time.
+template<typename T>
+struct WorkList {
+  std::set<T> work;
+
+  void push(T item) {
+    work.insert(item);
+  }
+
+  T pop() {
+    assert(!empty());
+    auto iter = work.begin();
+    auto ret = *iter;
+    work.erase(iter);
+    return ret;
+  }
+
+  size_t size() {
+    return work.size();
+  }
+
+  bool empty() {
+    return size() == 0;
+  }
+};
+
 } // namespace wasm
 
-#endif // wasm_support_one_time_work_list_h
+#endif // wasm_support_work_list_h

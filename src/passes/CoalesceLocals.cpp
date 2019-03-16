@@ -319,15 +319,24 @@ protected:
         value = Properties::getUnusedFallthrough(value);
         if (auto* tee = value->dynCast<SetLocal>()) {
           node->addDirect(setNodes[tee]);
+#if CFG_DEBUG
+          std::cout << "direct connection from " << set << " to " << tee << "\n";
+#endif
         } else if (auto* get = value->dynCast<GetLocal>()) {
           auto& sets = getSets.getSetsFor(get);
           if (sets.size() == 1) {
             node->addDirect(setNodes[*sets.begin()]);
+#if CFG_DEBUG
+            std::cout << "direct/get connection from " << set << " to " << *sets.begin() << "\n";
+#endif
           } else if (sets.size() > 1) {
             for (auto* otherSet : sets) {
               auto& otherNode = setNodes[otherSet];
               node->mergesIn.push_back(otherNode);
               otherNode->mergesOut.push_back(node.get());
+#if CFG_DEBUG
+              std::cout << "merge into " << set << " from " << otherSet << "\n";
+#endif
             }
           }
         }
@@ -339,13 +348,25 @@ protected:
       for (auto& start : nodes) {
         if (known(start->set)) continue;
         currClass++;
+#if CFG_DEBUG
+          std::cout << "start class " << currClass << "\n";
+#endif
         // Floodfill the current node.
-        OneTimeWorkList<Node*> work;
+        WorkList<Node*> work;
         work.push(start.get());
         while (!work.empty()) {
           auto* curr = work.pop();
           auto* set = curr->set;
-          assert(!known(set));
+          // At this point the class may be unknown, or it may be another class - consider
+          // the case that A and B are linked, and merge into C, and we start from C. Then C
+          // by itself can do nothing yet, until we first see the other two are identical,
+          // and get prompted to look again at C. In that case, we will trample the old
+          // class. In other words, we should only stop here if we see the class we are
+          // currently flooding (as we can do nothing more for it).
+          if (getClass(set) == currClass) continue;
+#if CFG_DEBUG
+          std::cout << "set class of " << set << "\n";
+#endif
           equivalenceClasses[set] = currClass;
           for (auto* direct : curr->directs) {
             work.push(direct);
@@ -353,9 +374,10 @@ protected:
           // Check outgoing merges - we may have enabled a node to be marked as
           // being in this equivalence class.
           for (auto* mergeOut : curr->mergesOut) {
-            if (known(mergeOut->set)) {
-              continue;
-            }
+#if CFG_DEBUG
+            std::cout << "consider mergeOut " << mergeOut->set << "\n";
+#endif
+            if (getClass(mergeOut->set) == currClass) continue;
             assert(!mergeOut->mergesIn.empty());
             bool ok = true;
             for (auto* mergeIn : mergeOut->mergesIn) {
@@ -365,11 +387,21 @@ protected:
               }
             }
             if (ok) {
+#if CFG_DEBUG
+              std::cout << "merge successful\n";
+#endif
               work.push(mergeOut);
             }
           }
         }
       }
+
+#if CFG_DEBUG
+      for (auto& node : nodes) {
+        auto* set = node->set;
+        std::cout << "set " << set << " has index " << set->index << " and class " << getClass(set) << '\n';
+      }
+#endif
     }
   };
 

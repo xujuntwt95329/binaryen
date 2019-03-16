@@ -21,7 +21,7 @@
 #ifndef liveness_traversal_h
 #define liveness_traversal_h
 
-#include "support/one_time_work_list.h"
+#include "support/work_list.h"
 #include "support/sorted_vector.h"
 #include "wasm.h"
 #include "wasm-builder.h"
