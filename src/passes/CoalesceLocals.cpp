@@ -1,5 +1,3 @@
-//#define CFG_DEBUG 1
-#include <wasm-printing.h>
 /*
  * Copyright 2016 WebAssembly Community Group participants
  *
@@ -319,24 +317,15 @@ protected:
         value = Properties::getUnusedFallthrough(value);
         if (auto* tee = value->dynCast<SetLocal>()) {
           node->addDirect(setNodes[tee]);
-#if CFG_DEBUG
-          std::cout << "direct connection from " << set << " to " << tee << "\n";
-#endif
         } else if (auto* get = value->dynCast<GetLocal>()) {
           auto& sets = getSets.getSetsFor(get);
           if (sets.size() == 1) {
             node->addDirect(setNodes[*sets.begin()]);
-#if CFG_DEBUG
-            std::cout << "direct/get connection from " << set << " to " << *sets.begin() << "\n";
-#endif
           } else if (sets.size() > 1) {
             for (auto* otherSet : sets) {
               auto& otherNode = setNodes[otherSet];
               node->mergesIn.push_back(otherNode);
               otherNode->mergesOut.push_back(node.get());
-#if CFG_DEBUG
-              std::cout << "merge into " << set << " from " << otherSet << "\n";
-#endif
             }
           }
         }
@@ -348,9 +337,6 @@ protected:
       for (auto& start : nodes) {
         if (known(start->set)) continue;
         currClass++;
-#if CFG_DEBUG
-          std::cout << "start class " << currClass << "\n";
-#endif
         // Floodfill the current node.
         WorkList<Node*> work;
         work.push(start.get());
@@ -364,9 +350,6 @@ protected:
           // class. In other words, we should only stop here if we see the class we are
           // currently flooding (as we can do nothing more for it).
           if (getClass(set) == currClass) continue;
-#if CFG_DEBUG
-          std::cout << "set class of " << set << "\n";
-#endif
           equivalenceClasses[set] = currClass;
           for (auto* direct : curr->directs) {
             work.push(direct);
@@ -374,9 +357,6 @@ protected:
           // Check outgoing merges - we may have enabled a node to be marked as
           // being in this equivalence class.
           for (auto* mergeOut : curr->mergesOut) {
-#if CFG_DEBUG
-            std::cout << "consider mergeOut " << mergeOut->set << "\n";
-#endif
             if (getClass(mergeOut->set) == currClass) continue;
             assert(!mergeOut->mergesIn.empty());
             bool ok = true;
@@ -387,9 +367,6 @@ protected:
               }
             }
             if (ok) {
-#if CFG_DEBUG
-              std::cout << "merge successful\n";
-#endif
               work.push(mergeOut);
             }
           }
@@ -446,14 +423,8 @@ protected:
         setIndexInterferences[(numSets * a) + b] = true;
       };
 
-//std::cout << "entry is " << parent.entry << '\n';
       for (auto* block : parent.liveBlocks) {
-//std::cout << "a block " << block << " with outs ";
-//for (auto* b : block->out) std::cout << b << ' ';
-//std::cout << "\n at the end: ";
         auto live = block->endIndexes;
-//for (auto* l : live) std::cout << l->index << ' ';
-//std::cout << '\n';
         // Everything coming in might interfere for the first time here, if they
         // come from different blocks.
         auto& out = block->out;
@@ -491,23 +462,13 @@ protected:
               }
             }
           } else {
-//std::cout << "  no difference\n";
-//for (auto* block : out) {
-//  std::cout << "    ";
-//  for (auto* set : block->startSets) {
-//    std::cout << set << " (" << set->index << ") ";
-//  }
-//  std::cout << '\n';
-//}
           }
         }
         // scan through the block itself
         auto& actions = block->actions;
         for (int i = int(actions.size()) - 1; i >= 0; i--) {
-//std::cout << " (at " << i << ")\n";
           auto& action = actions[i];
           if (auto* get = action.getGet()) {
-//std::cout << "  get: " << get->index << " now has live set(s)\n";
             // Potentially new live sets start here.
             // TODO: check if sets are already live
             auto& sets = getSets.getSetsFor(get);
@@ -519,7 +480,6 @@ protected:
               live.insert(index);
             }
           } if (auto* set = action.getSet()) {
-//std::cout << "  set: " << set->index << " is now gone\n";
             // This set is no longer live before this.
             auto index = indexer.setToIndex[set];
             live.erase(index);
