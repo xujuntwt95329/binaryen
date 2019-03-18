@@ -727,7 +727,6 @@
   (local $15 f64)
   (local $16 f64)
   (local $17 f64)
-  (local $18 f64)
   (local.set $13
    (i32.load offset=4
     (local.tee $12
@@ -811,20 +810,18 @@
             (f64.add
              (f64.mul
               (local.tee $2
-               (local.tee $18
-                (f64.sub
-                 (local.get $14)
-                 (f64.load
-                  (local.tee $1
-                   (i32.load offset=8
-                    (i32.add
-                     (i32.load
-                      (local.get $12)
-                     )
-                     (i32.shl
-                      (local.get $7)
-                      (i32.const 2)
-                     )
+               (f64.sub
+                (local.get $14)
+                (f64.load
+                 (local.tee $1
+                  (i32.load offset=8
+                   (i32.add
+                    (i32.load
+                     (local.get $12)
+                    )
+                    (i32.shl
+                     (local.get $7)
+                     (i32.const 2)
                     )
                    )
                   )
@@ -910,7 +907,7 @@
            (local.get $1)
           )
           (f64.mul
-           (local.get $18)
+           (local.get $2)
            (local.tee $2
             (f64.mul
              (local.get $17)
