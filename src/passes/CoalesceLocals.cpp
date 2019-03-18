@@ -1,3 +1,4 @@
+//#define CFG_DEBUG 1
 /*
  * Copyright 2016 WebAssembly Community Group participants
  *

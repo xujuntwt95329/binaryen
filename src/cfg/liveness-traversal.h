@@ -101,9 +101,11 @@ struct Liveness {
   // may be a great many potential elements but actual sets
   // may be fairly small. Specifically, we use a sorted
   // vector.
+// TODO: set, not vector
   using IndexSet = SortedVector<Index>;
 
   // A set of SetLocals.
+// TODO: set, not vector
   using SetSet = SortedVector<SetLocal*>;
 
   std::vector<LivenessAction> actions; // actions occurring in this block
@@ -231,57 +233,64 @@ private:
   }
 
   void flowSetLiveness() {
-    // Flow the sets in each block to the end of the block.
-    for (auto* block : liveBlocks) {
-      std::map<Index, SetLocal*> indexSets;
-      for (auto& action : block->actions) {
-        if (auto* set = action.getSet()) {
-          // Possibly overwrite a previous set.
-          indexSets[action.index] = set;
+    // Flow sets forward through blocks. The first time we flow though a block we also
+    // collect the sets in that block itself; later times we just flow anything new that
+    // arrives from outside.
+    std::set<BasicBlock*> flowedThrough;
+    std::map<BasicBlock*, Liveness::SetSet> newEnteringSets;
+    WorkList<BasicBlock*> work;
+    work.push(this->entry);
+    while (!work.empty()) {
+      auto* block = work.pop();
+      auto& arriving = newEnteringSets[block];
+      Liveness::SetSet live;
+      live.swap(arriving);
+      // Remove indexes that don't make it through the block.
+      live.filter([&](SetLocal* set) {
+        return !indexesSetInBlocks[block].has(set->index);
+      });
+      // If this is the first time we reach this block, add its own sets.
+      if (!flowedThrough.count(block)) {
+        flowedThrough.insert(block);
+        // Flow the sets in each block to the end of the block.
+        std::map<Index, SetLocal*> indexSets;
+        for (auto& action : block->actions) {
+          if (auto* set = action.getSet()) {
+            // Possibly overwrite a previous set.
+            indexSets[action.index] = set;
+          }
+        }
+        // We now know which of those sets *may* be live at the end. We'll filter by live
+        // indexes later.
+        for (auto& pair : indexSets) {
+          auto* set = pair.second;
+          live.insert(set);
         }
       }
-      // We know which sets may be live at the end. Verify by our knowledge of index liveness.
-      for (auto& pair : indexSets) {
-        auto index = pair.first;
-        auto* set = pair.second;
-        if (block->endIndexes.has(index)) {
-          block->endSets.insert(set);
+      live.forEach([&](SetLocal* set) {
+        // If the index is no longer live at the end (maybe all the gets appeared), stop.
+        if (!block->endIndexes.has(set->index)) {
+          return;
         }
-      }
-    }
-
-    // Flow sets forward through blocks.
-    // TODO: batching?
-    for (auto* block : liveBlocks) {
-      for (auto& action : block->actions) {
-        if (auto* set = action.getSet()) {
-          auto index = set->index;
-          if (block->endSets.has(set)) {
-            // This set is live at the end of the block - do the flow.
-            OneTimeWorkList<BasicBlock*> queue;
-            for (auto* succ : block->out) {
-              queue.push(succ);
-            }
-            while (!queue.empty()) {
-              auto* block = queue.pop();
-              // If the index is no longer live (may have flowed to just one of the children), stop.
-              if (!block->startIndexes.has(index)) continue;
-              // If already seen here, stop.
-              if (block->startSets.has(set)) continue;
-              block->startSets.insert(set);
-              // If it doesn't flow through, stop.
-              if (indexesSetInBlocks[block].has(index)) continue;
-              // If the index is no longer live at the end (maybe all the gets appeared), stop.
-              if (!block->endIndexes.has(index)) continue;
-              // It made it all the way through!
-              block->endSets.insert(set);
-              for (auto* succ : block->out) {
-                queue.push(succ);
-              }
+        // If already seen, stop.
+// TODO: SortedSet, and use the return value here
+        if (block->endSets.has(set)) {
+          return;
+        }
+        // Great, we found a new live set at the end of this block.
+        block->endSets.insert(set);
+        // Propagate to relevant successors (it may not flow to all of them).
+        for (auto* succ : block->out) {
+          if (succ->startIndexes.has(set->index)) {
+// TODO: SortedSet, as above
+            if (!succ->startSets.has(set)) {
+              succ->startSets.insert(set);
+              work.push(succ);
+              newEnteringSets[succ].insert(set);
             }
           }
         }
-      }
+      });
     }
   }
 };

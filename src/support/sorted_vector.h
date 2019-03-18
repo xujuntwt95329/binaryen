@@ -100,9 +100,16 @@ struct SortedVector : public std::vector<T> {
     return *this;
   }
 
+  template<typename U>
+  void forEach(U func) {
+    for (size_t i = 0; i < this->size(); i++) {
+      func((*this)[i]);
+    }
+  }
+
   void verify() const {
     for (size_t i = 1; i < this->size(); i++) {
-      assert((*this)[i - 1] < (*this)[i]);
+      assert((*this)[i - 1] <= (*this)[i]);
     }
   }
 
