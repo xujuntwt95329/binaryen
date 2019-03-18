@@ -250,8 +250,12 @@ private:
         return !indexesSetInBlocks[block].has(set->index);
       });
       // If this is the first time we reach this block, add its own sets.
-      if (!flowedThrough.count(block)) {
-        flowedThrough.insert(block);
+      bool firstTimeInBlock = flowedThrough.insert(block).second;
+      if (firstTimeInBlock) {
+        // Add all the successors, as we need to reach all live blocks at least once.
+        for (auto* succ : block->out) {
+          work.push(succ);
+        }
         // Flow the sets in each block to the end of the block.
         std::map<Index, SetLocal*> indexSets;
         for (auto& action : block->actions) {

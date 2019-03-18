@@ -113,8 +113,8 @@ struct SortedVector : public std::vector<T> {
     }
   }
 
-  void dump(const char* str = nullptr) const {
-    std::cout << "SortedVector " << (str ? str : "") << ": ";
+  void dump(const char* str = "SortedVector:") const {
+    std::cout << str;
     for (auto x : *this) std::cout << x << " ";
     std::cout << '\n';
   }
