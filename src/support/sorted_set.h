@@ -43,6 +43,7 @@ struct SortedSet : public SortedVector<T> {
     this->resize(this->size() + 1);
     std::move_backward(this->begin() + i, this->begin() + this->size() - 1, this->end());
     (*this)[i] = x;
+    return true;
   }
 
   bool erase(T x) {

@@ -22,7 +22,7 @@
 #define liveness_traversal_h
 
 #include "support/work_list.h"
-#include "support/sorted_vector.h"
+#include "support/sorted_set.h"
 #include "wasm.h"
 #include "wasm-builder.h"
 #include "wasm-traversal.h"
@@ -101,12 +101,10 @@ struct Liveness {
   // may be a great many potential elements but actual sets
   // may be fairly small. Specifically, we use a sorted
   // vector.
-// TODO: set, not vector
-  using IndexSet = SortedVector<Index>;
+  using IndexSet = SortedSet<Index>;
 
   // A set of SetLocals.
-// TODO: set, not vector
-  using SetSet = SortedVector<SetLocal*>;
+  using SetSet = SortedSet<SetLocal*>;
 
   std::vector<LivenessAction> actions; // actions occurring in this block
 
@@ -277,20 +275,15 @@ private:
           return;
         }
         // If already seen, stop.
-// TODO: SortedSet, and use the return value here
-        if (block->endSets.has(set)) {
-          return;
-        }
-        // Great, we found a new live set at the end of this block.
-        block->endSets.insert(set);
-        // Propagate to relevant successors (it may not flow to all of them).
-        for (auto* succ : block->out) {
-          if (succ->startIndexes.has(set->index)) {
-// TODO: SortedSet, as above
-            if (!succ->startSets.has(set)) {
-              succ->startSets.insert(set);
-              work.push(succ);
-              newEnteringSets[succ].insert(set);
+        if (block->endSets.insert(set)) {
+          // Great, we found a new live set at the end of this block.
+          // Propagate to relevant successors (it may not flow to all of them).
+          for (auto* succ : block->out) {
+            if (succ->startIndexes.has(set->index)) {
+              if (succ->startSets.insert(set)) {
+                work.push(succ);
+                newEnteringSets[succ].insert(set);
+              }
             }
           }
         }
