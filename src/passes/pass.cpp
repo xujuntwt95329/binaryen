@@ -194,10 +194,10 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   add("simplify-locals");
   add("vacuum");
   add("reorder-locals");
-  add("coalesce-locals");
-  add("reorder-locals");
-  add("vacuum");
   if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
+    add("coalesce-locals");
+    add("reorder-locals");
+    add("vacuum");
     add("code-folding");
   }
   add("merge-blocks"); // makes remove-unused-brs more effective

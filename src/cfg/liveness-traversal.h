@@ -234,8 +234,8 @@ private:
     // Flow sets forward through blocks. The first time we flow though a block we also
     // collect the sets in that block itself; later times we just flow anything new that
     // arrives from outside.
-    std::set<BasicBlock*> flowedThrough;
-    std::map<BasicBlock*, Liveness::SetSet> newEnteringSets;
+    std::unordered_set<BasicBlock*> flowedThrough;
+    std::unordered_map<BasicBlock*, Liveness::SetSet> newEnteringSets;
     WorkList<BasicBlock*> work;
     work.push(this->entry);
     while (!work.empty()) {
