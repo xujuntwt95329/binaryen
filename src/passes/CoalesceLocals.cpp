@@ -244,7 +244,6 @@ protected:
 
   // Equivalences between sets, that is, sets that have the exact same value assigned.
   // We can use this to avoid spurious interferences.
-  // TODO: handle constants here, so separate assigns to "17" are equivalent?
   class Equivalences {
   public:
     Equivalences(CoalesceLocals& parent, GetSets& getSets) : getSets(getSets) {
@@ -310,6 +309,8 @@ protected:
           }
         }
       }
+      // Note sets of a constant, and connect them all.
+      std::map<Literal, Node*> literalNodes;
       // Add connections.
       for (auto& node : nodes) {
         auto* set = node->set;
@@ -328,6 +329,14 @@ protected:
               node->mergesIn.push_back(otherNode);
               otherNode->mergesOut.push_back(node.get());
             }
+          }
+        } else if (auto* c = value->dynCast<Const>()) {
+          auto literal = c->value;
+          auto iter = literalNodes.find(literal);
+          if (iter != literalNodes.end()) {
+            node->addDirect(iter->second);
+          } else {
+            literalNodes[literal] = node.get();
           }
         }
       }
