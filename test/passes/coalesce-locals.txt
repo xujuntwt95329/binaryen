@@ -1252,4 +1252,35 @@
    (local.get $0)
   )
  )
+ (func $identical-consts-do-not-interfere (; 58 ;) (type $2)
+  (local $0 i32)
+  (local.set $0
+   (i32.const 5)
+  )
+  (local.set $0
+   (i32.const 5)
+  )
+  (drop
+   (local.get $0)
+  )
+  (drop
+   (local.get $0)
+  )
+ )
+ (func $differing-consts-do (; 59 ;) (type $2)
+  (local $0 i32)
+  (local $1 i32)
+  (local.set $0
+   (i32.const 5)
+  )
+  (local.set $1
+   (i32.const 6)
+  )
+  (drop
+   (local.get $0)
+  )
+  (drop
+   (local.get $1)
+  )
+ )
 )
