@@ -343,30 +343,42 @@ private:
       }
     }
     // Propagate SSA locals
-    for (auto& pair : localGraph.locations) {
-      auto* curr = pair.first;
-      if (auto* get = curr->dynCast<GetLocal>()) {
-        auto& sets = localGraph.getSetses[get];
-        if (sets.size() == 1) {
-          auto* set = *sets.begin();
-          if (set) {
-            auto* value = set->value;
-            Index otherIndex = get->index; // an invalid value, as we don't care about this case
-            if (auto* parentGet = value->dynCast<GetLocal>()) {
-              otherIndex = parentGet->index;
-            } else if (auto* parentSet = value->dynCast<SetLocal>()) {
-              otherIndex = parentSet->index;
-            }
-            if (otherIndex != get->index) {
-              // We started with a get, which has a single set. That set is assigned a local index,
-              // through either a set or a get. If all indexes are SSA, then we can propagate.
-              if (localGraph.isSSA(get->index) && localGraph.isSSA(otherIndex)) {
-                get->index = otherIndex;
+    while (true) {
+      bool worked = false;
+      for (auto& pair : localGraph.locations) {
+        auto* curr = pair.first;
+        if (auto* get = curr->dynCast<GetLocal>()) {
+          auto& sets = localGraph.getSetses[get];
+          if (sets.size() == 1) {
+            auto* set = *sets.begin();
+            if (set) {
+              auto* value = set->value;
+              Index otherIndex = get->index; // an invalid value, as we don't care about this case
+              if (auto* otherGet = value->dynCast<GetLocal>()) {
+                otherIndex = otherGet->index;
+              } else if (auto* otherSet = value->dynCast<SetLocal>()) {
+                otherIndex = otherSet->index;
+              }
+              if (otherIndex != get->index) {
+                // We started with a get, which has a single set. That set is assigned a local index,
+                // through either a set or a get. If all indexes are SSA, then we can propagate.
+                if (localGraph.isSSA(get->index) && localGraph.isSSA(otherIndex)) {
+                  get->index = otherIndex;
+                  // Update getSets.
+                  if (auto* otherGet = value->dynCast<GetLocal>()) {
+                    sets = localGraph.getSetses[otherGet];
+                  } else if (auto* otherSet = value->dynCast<SetLocal>()) {
+                    sets.clear();
+                    sets.insert(otherSet);
+                  }
+                  worked = true;
+                }
               }
             }
           }
         }
       }
+      if (!worked) break;
     }
   }
 };
