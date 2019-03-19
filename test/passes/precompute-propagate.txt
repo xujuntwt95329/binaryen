@@ -241,4 +241,26 @@
   (nop)
   (local.get $2)
  )
+ (func $ssa-multipass (; 16 ;) (type $0) (param $p i32)
+  (local $x i32)
+  (local $y i32)
+  (local $z i32)
+  (local.set $x
+   (local.get $p)
+  )
+  (local.set $y
+   (local.tee $z
+    (local.get $p)
+   )
+  )
+  (call $basic
+   (local.get $p)
+  )
+  (call $basic
+   (local.get $p)
+  )
+  (call $basic
+   (local.get $p)
+  )
+ )
 )
