@@ -1,0 +1,125 @@
+(module
+ (type $0 (func (param i32 i32 i32) (result i32)))
+ (type $1 (func (param i32)))
+ (type $2 (func (result i32)))
+ (func $multipass (; 0 ;) (type $0) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+  (local $3 i32)
+  (if
+   (local.get $3)
+   (local.set $3
+    (i32.const 24)
+   )
+  )
+  (if
+   (local.get $3)
+   (local.set $2
+    (i32.const 0)
+   )
+  )
+  (local.get $2)
+ )
+ (func $ssa-copies-multipass (; 1 ;) (type $1) (param $p i32)
+  (local $x i32)
+  (local $y i32)
+  (local $z i32)
+  (local.set $x
+   (local.get $p)
+  )
+  (local.set $y
+   (local.tee $z
+    (local.get $p)
+   )
+  )
+  (call $ssa-copies-multipass
+   (local.get $p)
+  )
+  (call $ssa-copies-multipass
+   (local.get $p)
+  )
+  (call $ssa-copies-multipass
+   (local.get $p)
+  )
+ )
+ (func $ssa-copies-multipass-b (; 2 ;) (type $2) (result i32)
+  (local $p i32)
+  (local $x i32)
+  (local $y i32)
+  (local $z i32)
+  (local.set $p
+   (call $ssa-copies-multipass-b)
+  )
+  (local.set $x
+   (local.get $p)
+  )
+  (local.set $y
+   (local.tee $z
+    (local.get $p)
+   )
+  )
+  (call $ssa-copies-multipass
+   (local.get $p)
+  )
+  (call $ssa-copies-multipass
+   (local.get $p)
+  )
+  (call $ssa-copies-multipass
+   (local.get $p)
+  )
+  (i32.const 0)
+ )
+ (func $ssa-copies-multipass-c (; 3 ;) (type $2) (result i32)
+  (local $x i32)
+  (local $y i32)
+  (local $z i32)
+  (local $p i32)
+  (local.set $p
+   (call $ssa-copies-multipass-c)
+  )
+  (local.set $x
+   (local.get $p)
+  )
+  (local.set $y
+   (local.tee $z
+    (local.get $p)
+   )
+  )
+  (call $ssa-copies-multipass
+   (local.get $p)
+  )
+  (call $ssa-copies-multipass
+   (local.get $p)
+  )
+  (call $ssa-copies-multipass
+   (local.get $p)
+  )
+  (i32.const 0)
+ )
+ (func $ssa-copies-careful-here (; 4 ;) (type $1) (param $0 i32)
+  (local $1 i32)
+  (if
+   (loop $label$1 (result i32)
+    (br_if $label$1
+     (local.tee $0
+      (local.tee $1
+       (i32.load8_s offset=2
+        (i32.const 0)
+       )
+      )
+     )
+    )
+    (i32.const -1)
+   )
+   (drop
+    (loop $label$3 (result f64)
+     (local.set $1
+      (i32.const 1)
+     )
+     (br_if $label$3
+      (local.get $1)
+     )
+     (f64.const 0)
+    )
+   )
+  )
+ )
+)
