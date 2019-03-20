@@ -138,5 +138,21 @@
       )
     )
   )
+  (func $multipass (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
+   (local $3 i32)
+   (if
+    (local.get $3)
+    (local.set $3 ;; this set is completely removed, allowing later opts
+     (i32.const 24)
+    )
+   )
+   (if
+    (local.get $3)
+    (local.set $2
+     (i32.const 0)
+    )
+   )
+   (local.get $2)
+  )
 )
 
