@@ -1,3 +1,4 @@
+#include <wasm-printing.h>
 /*
  * Copyright 2016 WebAssembly Community Group participants
  *
@@ -345,6 +346,7 @@ private:
         }
       }
     }
+{
     // Propagate SSA local indexes through copies. First, find all
     // possible indexes for each get, and the last one we see.
     auto originalGetSets = localGraph.getSetses;
@@ -355,9 +357,10 @@ private:
           auto& sets = originalGetSets[get];
           if (sets.size() == 1) {
             auto* set = *sets.begin();
-            if (set) {
+            if (set && set->type != unreachable) {
               auto* value = set->value;
               if (value->is<GetLocal>() || value->is<SetLocal>()) {
+                // Looks relevant - find all possible indexes.
                 std::set<Index> possibleIndexes;
                 OneTimeWorkList<Expression*> work;
                 work.push(value);
@@ -381,7 +384,7 @@ private:
                       auto& otherSets = originalGetSets[get];
                       if (otherSets.size() == 1) {
                         auto* otherSet = *otherSets.begin();
-                        if (otherSet) {
+                        if (otherSet && otherSet->type != unreachable) {
                           work.push(otherSet);
                         }
                       }
@@ -394,14 +397,17 @@ private:
                 // Naively, the best is the lowest index (to minimize LEB sizes and maximize
                 // compression), and which is also usually the the earliest set (which may let us
                 // skip intermediate copies).
-                auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
-                assert(bestIndex != get->index);
-                get->index = bestIndex;
-                // Note that we don't update getSets here - we work on the original data, and just
-                // make changes that preserve equivalence while we work.
+                if (!possibleIndexes.empty()) {
+                  auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
+                  assert(bestIndex != get->index);
+                  get->index = bestIndex;
+                  // Note that we don't update getSets here - we work on the original data, and just
+                  // make changes that preserve equivalence while we work.
 // TODO needed?
-                worked = true;
+if (getenv("MOAR"))
+                  worked = true;
 // TODO needed?
+                }
               }
             }
           }
@@ -409,6 +415,7 @@ private:
       }
     }
   }
+}
 };
 
 Pass *createPrecomputePass() {
