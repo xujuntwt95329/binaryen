@@ -25,6 +25,10 @@
 //  a = b
 //  c = b
 //
+// Using original indexes, instead of intermediate ones, lets us skip copies in
+// the middle, which may be optimized our later. Also, earlier sets tend to have
+// lower indexes which can have smaller LEB sizes.
+//
 
 #include <algorithm>
 
@@ -106,9 +110,6 @@ struct CopyPropagation : public WalkerPass<PostWalker<CopyPropagation>> {
                   }
                 }
                 // We found all the possible indexes that are equivalent to our own, pick the best.
-                // Naively, the best is the lowest index (to minimize LEB sizes and maximize
-                // compression), and which is also usually the the earliest set (which may let us
-                // skip intermediate copies).
                 if (!possibleIndexes.empty()) {
                   auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
                   assert(bestIndex != get->index);
