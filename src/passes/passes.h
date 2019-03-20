@@ -27,6 +27,7 @@ Pass* createCoalesceLocalsWithLearningPass();
 Pass* createCodeFoldingPass();
 Pass* createCodePushingPass();
 Pass* createConstHoistingPass();
+Pass* createCopyPropagationPass();
 Pass* createDAEPass();
 Pass* createDAEOptimizingPass();
 Pass* createDataFlowOptsPass();

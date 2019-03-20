@@ -1,4 +1,3 @@
-#include <wasm-printing.h>
 /*
  * Copyright 2016 WebAssembly Community Group participants
  *
@@ -28,8 +27,6 @@
 // looked at.
 //
 
-#include <algorithm>
-
 #include <wasm.h>
 #include <pass.h>
 #include <wasm-builder.h>
@@ -38,8 +35,6 @@
 #include <ir/literal-utils.h>
 #include <ir/local-graph.h>
 #include <ir/manipulation.h>
-#include <ir/properties.h>
-#include <support/work_list.h>
 
 namespace wasm {
 
@@ -155,14 +150,14 @@ struct Precompute : public WalkerPass<PostWalker<Precompute, UnifiedExpressionVi
     // propagation opportunities
     do {
       getValues.clear();
-      // do the main walk over everything
-      worked = false;
       // with extra effort, we can utilize the get-set graph to precompute
       // things that use locals that are known to be constant. otherwise,
       // we just look at what is immediately before us
       if (propagate) {
         optimizeLocals(func);
       }
+      // do the main walk over everything
+      worked = false;
       super::doWalkFunction(func);
     } while (propagate && worked);
   }
@@ -276,7 +271,6 @@ private:
     // compute all dependencies
     LocalGraph localGraph(func);
     localGraph.computeInfluences();
-    localGraph.computeSSAIndexes();
     // prepare the work list. we add things here that might change to a constant
     // initially, that means everything
     std::unordered_set<Expression*> work;
@@ -347,88 +341,7 @@ private:
         }
       }
     }
-{
-    // Propagate SSA local indexes through copies. First, find all
-    // possible indexes for each get, and the last one we see.
-    auto originalGetSets = localGraph.getSetses;
-    for (auto& pair : localGraph.locations) {
-      auto* curr = pair.first;
-      if (auto* get = curr->dynCast<GetLocal>()) {
-        if (localGraph.isSSA(get->index)) {
-          // Given a get, we have a relevant set if it has exactly one set, the set
-          // is not nullptr, and it is reachable.
-          auto getRelevantSet = [&](GetLocal* get) -> SetLocal* {
-            auto& sets = originalGetSets[get];
-            if (sets.size() == 1) {
-              auto* set = *sets.begin();
-              if (set && set->type != unreachable) {
-                return set;
-              }
-            } 
-            return nullptr;
-          };
-          // A relevant set-value is one that is itself a set, or a get.
-          auto getRelevantSetValue = [&](SetLocal* set) -> Expression* {
-            auto* value = Properties::getUnusedFallthrough(set->value);
-            if (value->is<GetLocal>() || value->is<SetLocal>()) {
-              return value;
-            }
-            return nullptr;
-          };
-          if (auto* set = getRelevantSet(get)) {
-            if (auto* value = getRelevantSetValue(set)) {
-              // Looks relevant - find all possible indexes.
-              std::set<Index> possibleIndexes;
-              OneTimeWorkList<Expression*> work;
-              work.push(value);
-              while (!work.empty()) {
-                auto* value = work.pop();
-                if (auto* otherSet = value->dynCast<SetLocal>()) {
-                  auto index = otherSet->index;
-                  if (localGraph.isSSA(index)) {
-                    if (index != get->index) {
-                      possibleIndexes.insert(index);
-                    }
-                    if (auto* otherValue = getRelevantSetValue(otherSet)) {
-                      work.push(otherValue);
-                    }
-                  }
-                } else if (auto* otherGet = value->dynCast<GetLocal>()) {
-                  auto index = otherGet->index;
-                  if (localGraph.isSSA(index)) {
-                    if (index != get->index) {
-                      possibleIndexes.insert(index);
-                    }
-                    if (auto* otherSet = getRelevantSet(otherGet)) {
-                      work.push(otherSet);
-                    }
-                  }
-                } else {
-                  WASM_UNREACHABLE();
-                }
-              }
-              // We found all the possible indexes that are equivalent to our own, pick the best.
-              // Naively, the best is the lowest index (to minimize LEB sizes and maximize
-              // compression), and which is also usually the the earliest set (which may let us
-              // skip intermediate copies).
-              if (!possibleIndexes.empty()) {
-                auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
-                assert(bestIndex != get->index);
-                get->index = bestIndex;
-                // Note that we don't update getSets here - we work on the original data, and just
-                // make changes that preserve equivalence while we work.
-// TODO needed?
-if (getenv("MOAR"))
-                worked = true;
-// TODO needed?
-              }
-            }
-          }
-        }
-      }
-    }
   }
-}
 };
 
 Pass *createPrecomputePass() {

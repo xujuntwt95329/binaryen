@@ -74,6 +74,7 @@ void PassRegistry::registerPasses() {
   registerPass("code-pushing", "push code forward, potentially making it not always execute", createCodePushingPass);
   registerPass("code-folding", "fold code, merging duplicates", createCodeFoldingPass);
   registerPass("const-hoisting", "hoist repeated constants to a local", createConstHoistingPass);
+  registerPass("copy-propagation", "propagate SSA indexes through copies", createCopyPropagationPass);
   registerPass("dce", "removes unreachable code", createDeadCodeEliminationPass);
   registerPass("dfo", "optimizes using the DataFlow SSA IR", createDataFlowOptsPass);
   registerPass("duplicate-function-elimination", "removes duplicate functions", createDuplicateFunctionEliminationPass);
@@ -181,6 +182,9 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   }
   if (options.optimizeLevel >= 2 || options.shrinkLevel >= 2) {
     add("code-pushing");
+  }
+  if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
+    add("copy-propagation");
   }
   add("simplify-locals-nostructure"); // don't create if/block return values yet, as coalesce can remove copies that that could inhibit
   add("vacuum"); // previous pass creates garbage

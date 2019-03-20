@@ -9,6 +9,7 @@ SET(passes_SOURCES
   CodePushing.cpp
   CodeFolding.cpp
   ConstHoisting.cpp
+  CopyPropagation.cpp
   DataFlowOpts.cpp
   DeadArgumentElimination.cpp
   DeadCodeElimination.cpp
