@@ -183,7 +183,9 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   if (options.optimizeLevel >= 2 || options.shrinkLevel >= 2) {
     add("code-pushing");
   }
-
+  if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
+    add("copy-propagation");
+  }
   add("simplify-locals-nostructure"); // don't create if/block return values yet, as coalesce can remove copies that that could inhibit
   add("vacuum"); // previous pass creates garbage
   add("reorder-locals");
