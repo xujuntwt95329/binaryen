@@ -376,8 +376,10 @@ private:
                     }
                   } else if (auto* otherGet = value->dynCast<GetLocal>()) {
                     auto index = otherGet->index;
-                    possibleIndexes.insert(index);
-                    lastPossibleIndex = index;
+                    if (index != get->index) {
+                      possibleIndexes.insert(index);
+                      lastPossibleIndex = index;
+                    }
                     if (localGraph.isSSA(index)) {
                       auto& otherSets = originalGetSets[get];
                       if (otherSets.size() == 1) {
@@ -396,13 +398,15 @@ private:
                 // compression), but also the last possible index - the earliest set - may be
                 // good (by skipping intermediate copies).
                 auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
-                get->index = bestIndex;
+                if (bestIndex != get->index) {
+                  get->index = bestIndex;
 if (lastPossibleIndex){}
                 // Note that we don't update getSets here - we work on the original data, and just
                 // make changes that preserve equivalence while we work.
 // TODO needed?
-                worked = true;
+                  worked = true;
 // TODO needed?
+                }
               }
             }
           }
