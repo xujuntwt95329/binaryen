@@ -38,6 +38,7 @@
 #include <ir/literal-utils.h>
 #include <ir/local-graph.h>
 #include <ir/manipulation.h>
+#include <ir/properties.h>
 #include <support/work_list.h>
 
 namespace wasm {
@@ -354,60 +355,72 @@ private:
       auto* curr = pair.first;
       if (auto* get = curr->dynCast<GetLocal>()) {
         if (localGraph.isSSA(get->index)) {
-          auto& sets = originalGetSets[get];
-          if (sets.size() == 1) {
-            auto* set = *sets.begin();
-            if (set && set->type != unreachable) {
-              auto* value = set->value;
-              if (value->is<GetLocal>() || value->is<SetLocal>()) {
-                // Looks relevant - find all possible indexes.
-                std::set<Index> possibleIndexes;
-                OneTimeWorkList<Expression*> work;
-                work.push(value);
-                while (!work.empty()) {
-                  auto* value = work.pop();
-                  if (auto* otherSet = value->dynCast<SetLocal>()) {
-                    auto index = otherSet->index;
+          // Given a get, we have a relevant set if it has exactly one set, the set
+          // is not nullptr, and it is reachable.
+          auto getRelevantSet = [&](GetLocal* get) -> SetLocal* {
+            auto& sets = originalGetSets[get];
+            if (sets.size() == 1) {
+              auto* set = *sets.begin();
+              if (set && set->type != unreachable) {
+                return set;
+              }
+            } 
+            return nullptr;
+          };
+          // A relevant set-value is one that is itself a set, or a get.
+          auto getRelevantSetValue = [&](SetLocal* set) -> Expression* {
+            auto* value = Properties::getUnusedFallthrough(set->value);
+            if (value->is<GetLocal>() || value->is<SetLocal>()) {
+              return value;
+            }
+            return nullptr;
+          };
+          if (auto* set = getRelevantSet(get)) {
+            if (auto* value = getRelevantSetValue(set)) {
+              // Looks relevant - find all possible indexes.
+              std::set<Index> possibleIndexes;
+              OneTimeWorkList<Expression*> work;
+              work.push(value);
+              while (!work.empty()) {
+                auto* value = work.pop();
+                if (auto* otherSet = value->dynCast<SetLocal>()) {
+                  auto index = otherSet->index;
+                  if (localGraph.isSSA(index)) {
                     if (index != get->index) {
                       possibleIndexes.insert(index);
                     }
-                    auto* otherValue = otherSet->value;
-                    if (otherValue->is<GetLocal>() || otherValue->is<SetLocal>()) {
+                    if (auto* otherValue = getRelevantSetValue(otherSet)) {
                       work.push(otherValue);
                     }
-                  } else if (auto* otherGet = value->dynCast<GetLocal>()) {
-                    auto index = otherGet->index;
+                  }
+                } else if (auto* otherGet = value->dynCast<GetLocal>()) {
+                  auto index = otherGet->index;
+                  if (localGraph.isSSA(index)) {
                     if (index != get->index) {
                       possibleIndexes.insert(index);
                     }
-                    if (localGraph.isSSA(index)) {
-                      auto& otherSets = originalGetSets[get];
-                      if (otherSets.size() == 1) {
-                        auto* otherSet = *otherSets.begin();
-                        if (otherSet && otherSet->type != unreachable) {
-                          work.push(otherSet);
-                        }
-                      }
+                    if (auto* otherSet = getRelevantSet(otherGet)) {
+                      work.push(otherSet);
                     }
-                  } else {
-                    WASM_UNREACHABLE();
                   }
+                } else {
+                  WASM_UNREACHABLE();
                 }
-                // We found all the possible indexes that are equivalent to our own, pick the best.
-                // Naively, the best is the lowest index (to minimize LEB sizes and maximize
-                // compression), and which is also usually the the earliest set (which may let us
-                // skip intermediate copies).
-                if (!possibleIndexes.empty()) {
-                  auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
-                  assert(bestIndex != get->index);
-                  get->index = bestIndex;
-                  // Note that we don't update getSets here - we work on the original data, and just
-                  // make changes that preserve equivalence while we work.
+              }
+              // We found all the possible indexes that are equivalent to our own, pick the best.
+              // Naively, the best is the lowest index (to minimize LEB sizes and maximize
+              // compression), and which is also usually the the earliest set (which may let us
+              // skip intermediate copies).
+              if (!possibleIndexes.empty()) {
+                auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
+                assert(bestIndex != get->index);
+                get->index = bestIndex;
+                // Note that we don't update getSets here - we work on the original data, and just
+                // make changes that preserve equivalence while we work.
 // TODO needed?
 if (getenv("MOAR"))
-                  worked = true;
+                worked = true;
 // TODO needed?
-                }
               }
             }
           }

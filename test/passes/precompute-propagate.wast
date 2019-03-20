@@ -212,5 +212,33 @@
     (call 0 (local.get $z))
     (i32.const 0)
   )
+  (func $ssa-copies-careful-here (param $0 i32)
+   (local $1 i32)
+   (if
+    (loop $label$1 (result i32)
+     (br_if $label$1
+      (local.tee $0
+       (local.tee $1
+        (i32.load8_s offset=2
+         (i32.const 0)
+        )
+       )
+      )
+     )
+     (i32.const -1)
+    )
+    (drop
+     (loop $label$3 (result f64)
+      (local.set $1
+       (i32.const 1)
+      )
+      (br_if $label$3
+       (local.get $1)
+      )
+      (f64.const 0)
+     )
+    )
+   )
+  )
 )
 
