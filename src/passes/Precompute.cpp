@@ -392,8 +392,8 @@ private:
                 }
                 // We found all the possible indexes that are equivalent to our own, pick the best.
                 // Naively, the best is the lowest index (to minimize LEB sizes and maximize
-                // compression), but also the last possible index - the earliest set - may be
-                // good (by skipping intermediate copies).
+                // compression), and which is also usually the the earliest set (which may let us
+                // skip intermediate copies).
                 auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
                 assert(bestIndex != get->index);
                 get->index = bestIndex;
