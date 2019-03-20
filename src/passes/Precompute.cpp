@@ -397,6 +397,7 @@ private:
                 // good (by skipping intermediate copies).
                 auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
                 get->index = bestIndex;
+if (lastPossibleIndex){}
                 // Note that we don't update getSets here - we work on the original data, and just
                 // make changes that preserve equivalence while we work.
 // TODO needed?
