@@ -194,9 +194,6 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   if (options.optimizeLevel >= 3 || options.shrinkLevel >= 2) {
     add("merge-locals"); // very slow on e.g. sqlite
   }
-  if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
-    add("copy-propagation");
-  }
   add("coalesce-locals");
   add("simplify-locals");
   add("vacuum");
@@ -204,6 +201,9 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   add("coalesce-locals");
   add("reorder-locals");
   add("vacuum");
+  if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
+    add("copy-propagation");
+  }
   if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
     add("code-folding");
   }
