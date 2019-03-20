@@ -33,33 +33,31 @@
   )
  )
  (func $opts (; 2 ;) (type $0) (param $0 i32) (param $1 i32) (result i32)
-  (local $2 i32)
   ;;@ even-opted.cpp:3:0
   (i32.add
    ;;@ even-opted.cpp:1:0
    (if (result i32)
-    (local.tee $2
-     (local.tee $1
-      (i32.shr_s
-       ;;@ even-opted.cpp:2:0
-       (local.get $1)
-       ;;@ even-opted.cpp:1:0
-       (local.tee $0
-        (i32.add
-         (local.get $0)
-         (local.get $1)
-        )
+    (local.tee $1
+     (i32.shr_s
+      ;;@ even-opted.cpp:2:0
+      (local.get $1)
+      ;;@ even-opted.cpp:1:0
+      (local.tee $0
+       (i32.add
+        (local.get $0)
+        (local.get $1)
        )
       )
      )
     )
-    ;;@ even-opted.cpp:3:0
+    ;;@ even-opted.cpp:2:0
     (i32.rem_s
      (local.get $0)
-     (local.get $2)
+     (local.get $1)
     )
     (i32.const 0)
    )
+   ;;@ even-opted.cpp:3:0
    (local.get $1)
   )
  )

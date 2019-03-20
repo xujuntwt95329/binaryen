@@ -154,7 +154,7 @@
    )
    (local.get $2)
   )
-  (func $ssa-multipass (param $p i32)
+  (func $ssa-copies-multipass (param $p i32)
     (local $x i32)
     (local $y i32)
     (local $z i32)
@@ -169,6 +169,48 @@
     (call 0 (local.get $x))
     (call 0 (local.get $y))
     (call 0 (local.get $z))
+  )
+  (func $ssa-copies-multipass-b (result i32)
+    (local $p i32)
+    (local $x i32)
+    (local $y i32)
+    (local $z i32)
+    (local.set $p
+      (call $ssa-copies-multipass-b)
+    )
+    (local.set $x
+      (local.get $p)
+    )
+    (local.set $y
+      (local.tee $z
+        (local.get $x)
+      )
+    )
+    (call 0 (local.get $x))
+    (call 0 (local.get $y))
+    (call 0 (local.get $z))
+    (i32.const 0)
+  )
+  (func $ssa-copies-multipass-c (result i32)
+    (local $x i32)
+    (local $y i32)
+    (local $z i32)
+    (local $p i32) ;; now $p is the last
+    (local.set $p
+      (call $ssa-copies-multipass-c)
+    )
+    (local.set $x
+      (local.get $p)
+    )
+    (local.set $y
+      (local.tee $z
+        (local.get $x)
+      )
+    )
+    (call 0 (local.get $x))
+    (call 0 (local.get $y))
+    (call 0 (local.get $z))
+    (i32.const 0)
   )
 )
 

@@ -27,6 +27,8 @@
 // looked at.
 //
 
+#include <algorithm>
+
 #include <wasm.h>
 #include <pass.h>
 #include <wasm-builder.h>
@@ -35,6 +37,7 @@
 #include <ir/literal-utils.h>
 #include <ir/local-graph.h>
 #include <ir/manipulation.h>
+#include <support/work_list.h>
 
 namespace wasm {
 
@@ -342,34 +345,63 @@ private:
         }
       }
     }
-    // Propagate SSA locals
+    // Propagate SSA local indexes through copies. First, find all
+    // possible indexes for each get, and the last one we see.
+    auto originalGetSets = localGraph.getSetses;
     for (auto& pair : localGraph.locations) {
       auto* curr = pair.first;
       if (auto* get = curr->dynCast<GetLocal>()) {
-        auto& sets = localGraph.getSetses[get];
-        if (sets.size() == 1) {
-          auto* set = *sets.begin();
-          if (set) {
-            auto* value = set->value;
-            Index otherIndex = get->index; // an invalid value, as we don't care about this case
-            if (auto* otherGet = value->dynCast<GetLocal>()) {
-              otherIndex = otherGet->index;
-            } else if (auto* otherSet = value->dynCast<SetLocal>()) {
-              otherIndex = otherSet->index;
-            }
-            if (otherIndex != get->index) {
-              // We started with a get, which has a single set. That set is assigned a local index,
-              // through either a set or a get. If all indexes are SSA, then we can propagate.
-              if (localGraph.isSSA(get->index) && localGraph.isSSA(otherIndex)) {
-                get->index = otherIndex;
-                // Update getSets.
-                if (auto* otherGet = value->dynCast<GetLocal>()) {
-                  sets = localGraph.getSetses[otherGet];
-                } else if (auto* otherSet = value->dynCast<SetLocal>()) {
-                  sets.clear();
-                  sets.insert(otherSet);
+        if (localGraph.isSSA(get->index)) {
+          auto& sets = originalGetSets[get];
+          if (sets.size() == 1) {
+            auto* set = *sets.begin();
+            if (set) {
+              auto* value = set->value;
+              if (value->is<GetLocal>() || value->is<SetLocal>()) {
+                std::set<Index> possibleIndexes;
+                Index lastPossibleIndex = get->index;
+                OneTimeWorkList<Expression*> work;
+                work.push(value);
+                while (!work.empty()) {
+                  auto* value = work.pop();
+                  if (auto* otherSet = value->dynCast<SetLocal>()) {
+                    auto index = otherSet->index;
+                    if (index != get->index) {
+                      possibleIndexes.insert(index);
+                      lastPossibleIndex = index;
+                    }
+                    auto* otherValue = otherSet->value;
+                    if (otherValue->is<GetLocal>() || otherValue->is<SetLocal>()) {
+                      work.push(otherValue);
+                    }
+                  } else if (auto* otherGet = value->dynCast<GetLocal>()) {
+                    auto index = otherGet->index;
+                    possibleIndexes.insert(index);
+                    lastPossibleIndex = index;
+                    if (localGraph.isSSA(index)) {
+                      auto& otherSets = originalGetSets[get];
+                      if (otherSets.size() == 1) {
+                        auto* otherSet = *otherSets.begin();
+                        if (otherSet) {
+                          work.push(otherSet);
+                        }
+                      }
+                    }
+                  } else {
+                    WASM_UNREACHABLE();
+                  }
                 }
+                // We found all the possible indexes that are equivalent to our own, pick the best.
+                // Naively, the best is the lowest index (to minimize LEB sizes and maximize
+                // compression), but also the last possible index - the earliest set - may be
+                // good (by skipping intermediate copies).
+                auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
+                get->index = bestIndex;
+                // Note that we don't update getSets here - we work on the original data, and just
+                // make changes that preserve equivalence while we work.
+// TODO needed?
                 worked = true;
+// TODO needed?
               }
             }
           }
