@@ -359,7 +359,6 @@ private:
               auto* value = set->value;
               if (value->is<GetLocal>() || value->is<SetLocal>()) {
                 std::set<Index> possibleIndexes;
-                Index lastPossibleIndex = get->index;
                 OneTimeWorkList<Expression*> work;
                 work.push(value);
                 while (!work.empty()) {
@@ -368,7 +367,6 @@ private:
                     auto index = otherSet->index;
                     if (index != get->index) {
                       possibleIndexes.insert(index);
-                      lastPossibleIndex = index;
                     }
                     auto* otherValue = otherSet->value;
                     if (otherValue->is<GetLocal>() || otherValue->is<SetLocal>()) {
@@ -378,7 +376,6 @@ private:
                     auto index = otherGet->index;
                     if (index != get->index) {
                       possibleIndexes.insert(index);
-                      lastPossibleIndex = index;
                     }
                     if (localGraph.isSSA(index)) {
                       auto& otherSets = originalGetSets[get];
@@ -398,15 +395,13 @@ private:
                 // compression), but also the last possible index - the earliest set - may be
                 // good (by skipping intermediate copies).
                 auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
-                if (bestIndex != get->index) {
-                  get->index = bestIndex;
-if (lastPossibleIndex){}
+                assert(bestIndex != get->index);
+                get->index = bestIndex;
                 // Note that we don't update getSets here - we work on the original data, and just
                 // make changes that preserve equivalence while we work.
 // TODO needed?
-                  worked = true;
+                worked = true;
 // TODO needed?
-                }
               }
             }
           }
