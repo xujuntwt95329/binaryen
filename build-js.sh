@@ -96,6 +96,7 @@ echo "building shared bitcode"
   $BINARYEN_SRC/passes/CodeFolding.cpp \
   $BINARYEN_SRC/passes/CodePushing.cpp \
   $BINARYEN_SRC/passes/ConstHoisting.cpp \
+  $BINARYEN_SRC/passes/CopyPropagation.cpp \
   $BINARYEN_SRC/passes/DataFlowOpts.cpp \
   $BINARYEN_SRC/passes/DeadCodeElimination.cpp \
   $BINARYEN_SRC/passes/DuplicateFunctionElimination.cpp \
