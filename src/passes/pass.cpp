@@ -76,6 +76,7 @@ void PassRegistry::registerPasses() {
   registerPass("const-hoisting", "hoist repeated constants to a local", createConstHoistingPass);
   registerPass("dce", "removes unreachable code", createDeadCodeEliminationPass);
   registerPass("dfo", "optimizes using the DataFlow SSA IR", createDataFlowOptsPass);
+  registerPass("delicm", "de-licm", createDeLoopInvariantCodeMotionPass);
   registerPass("duplicate-function-elimination", "removes duplicate functions", createDuplicateFunctionEliminationPass);
   registerPass("extract-function", "leaves just one function (useful for debugging)", createExtractFunctionPass);
   registerPass("flatten", "flattens out code, removing nesting", createFlattenPass);
