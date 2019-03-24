@@ -304,8 +304,12 @@ private:
         if (!isSetUnneeded(curr)) {
           curr->value = value;
         } else {
-          ExpressionManipulator::convert<SetLocal, Drop>(curr);
-          curr->value = value;
+          if (curr->type == none) {
+            auto* drop = ExpressionManipulator::convert<SetLocal, Drop>(curr);
+            drop->value = value;
+          } else {
+            replaceCurrent(value);
+          }
         }
       }
     } unInstrumenter(func);
