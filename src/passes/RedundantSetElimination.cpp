@@ -34,12 +34,17 @@
 #include <ir/find_all.h>
 #include <ir/local-graph.h>
 #include <ir/literal-utils.h>
+#include <ir/properties.h>
 #include <ir/utils.h>
+#include <support/work_list.h>
 
 namespace wasm {
 
-#if 0
+namespace {
+
 // Finds which sets are equivalent, that is, must contain the same value.
+// In addition to sets, constant values are also tracked (for the zero-init
+// values in particular, which have no sets).
 class Equivalences {
 public:
   Equivalences(Function* func) : func(func), graph(func) {
@@ -52,8 +57,8 @@ public:
 
   // Return the class. 0 is the "null class" - we haven't calculated it yet.
   Index getClass(SetLocal* set) {
-    auto iter = equivalenceClasses.find(set);
-    if (iter == equivalenceClasses.end()) {
+    auto iter = setClasses.find(set);
+    if (iter == setClasses.end()) {
       return 0;
     }
     auto ret = iter->second;
@@ -71,12 +76,22 @@ public:
     return getClass(set) != 0;
   }
 
+  Index getClass(Literal literal) {
+    auto iter = literalClasses.find(literal);
+    if (iter == literalClasses.end()) {
+      return 0;
+    }
+    return iter->second;
+  }
+
 private:
   Function* func;
   LocalGraph graph;
 
   // There is a unique id for each class, which this maps sets to.
-  std::unordered_map<SetLocal*, Index> equivalenceClasses;
+  std::unordered_map<SetLocal*, Index> setClasses;
+
+  std::unordered_map<Literal, Index> literalClasses;
 
   void compute() {
     FindAll<SetLocal> allSets(func->body);
@@ -88,6 +103,7 @@ private:
 
       std::vector<Node*> directs; // direct equivalences, resulting from copying a value
       std::vector<Node*> mergesIn, mergesOut;
+      Literal literal;
 
       void addDirect(Node* other) {
         directs.push_back(other);
@@ -97,7 +113,7 @@ private:
     std::vector<std::unique_ptr<Node>> nodes;
     std::map<SetLocal*, Node*> setNodes;
     // Add sets in the function body.
-    for (auto* set : allSets) {
+    for (auto* set : allSets.list) {
       auto node = make_unique<Node>();
       node->set = set;
       setNodes.emplace(set, node.get());
@@ -114,7 +130,7 @@ private:
       if (auto* tee = value->dynCast<SetLocal>()) {
         node->addDirect(setNodes[tee]);
       } else if (auto* get = value->dynCast<GetLocal>()) {
-        auto& sets = getSets.getSetsFor(get);
+        auto& sets = graph.getSetses[get];
         if (sets.size() == 1) {
           node->addDirect(setNodes[*sets.begin()]);
         } else if (sets.size() > 1) {
@@ -132,6 +148,7 @@ private:
         } else {
           literalNodes[literal] = node.get();
         }
+        node->literal = literal;
       }
     }
     // Calculating the final classes is mostly a simple floodfill operation,
@@ -145,8 +162,8 @@ private:
       WorkList<Node*> work;
       work.push(start.get());
       while (!work.empty()) {
-        auto* curr = work.pop();
-        auto* set = curr->set;
+        auto* node = work.pop();
+        auto* set = node->set;
         // At this point the class may be unknown, or it may be another class - consider
         // the case that A and B are linked, and merge into C, and we start from C. Then C
         // by itself can do nothing yet, until we first see the other two are identical,
@@ -154,13 +171,14 @@ private:
         // class. In other words, we should only stop here if we see the class we are
         // currently flooding (as we can do nothing more for it).
         if (getClass(set) == currClass) continue;
-        equivalenceClasses[set] = currClass;
-        for (auto* direct : curr->directs) {
+        setClasses[set] = currClass;
+        literalClasses[node->literal] = currClass;
+        for (auto* direct : node->directs) {
           work.push(direct);
         }
         // Check outgoing merges - we may have enabled a node to be marked as
         // being in this equivalence class.
-        for (auto* mergeOut : curr->mergesOut) {
+        for (auto* mergeOut : node->mergesOut) {
           if (getClass(mergeOut->set) == currClass) continue;
           assert(!mergeOut->mergesIn.empty());
           bool ok = true;
@@ -177,7 +195,7 @@ private:
       }
     }
 
-#if CFG_DEBUG
+#if EQUIVALENCES_DEBUG
     for (auto& node : nodes) {
       auto* set = node->set;
       std::cout << "set " << set << " has index " << set->index << " and class " << getClass(set) << '\n';
@@ -185,10 +203,6 @@ private:
 #endif
   }
 };
-
-#endif
-
-namespace {
 
 // Instrumentation helpers.
 
@@ -220,6 +234,8 @@ struct RedundantSetElimination : public WalkerPass<PostWalker<RedundantSetElimin
   // main entry point
 
   void doWalkFunction(Function* func) {
+    Equivalences equivalences_(func);
+    equivalences = &equivalences_;
     // Instrument the function so we can tell what value is present at a local
     // index right before each set.
     instrument(func);
@@ -233,26 +249,26 @@ struct RedundantSetElimination : public WalkerPass<PostWalker<RedundantSetElimin
     }
     // Clean up.
     unInstrument(func);
+    equivalences = nullptr;
   }
 
   LocalGraph* graph;
+  Equivalences* equivalences;
 
   void visitSetLocal(SetLocal* curr) {
     if (curr->type == unreachable) return;
     auto* getBeforeSet = getInstrumentedGet(curr);
     auto& sets = graph->getSetses[getBeforeSet];
-    if (sets.size() == 1) {
+    if (sets.size() == 1) { // TODO: if multiple, check if all equivalent
       auto* parent = *sets.begin();
-      auto* currValue = getInstrumentedValue(curr);
-      if (!parent) {
-        if (LiteralUtils::isEqualTo(currValue, Literal::makeZero(curr->value->type))) {
-          markSetAsUnneeded(curr);
-        }
+      Index parentClass;
+      if (parent) {
+        parentClass = equivalences->getClass(parent);
       } else {
-        auto* parentValue = getInstrumentedValue(parent);
-        if (LiteralUtils::isEqualTo(parentValue, currValue)) {
-          markSetAsUnneeded(curr);
-        }
+        parentClass = equivalences->getClass(Literal::makeZero(curr->value->type));
+      }
+      if (equivalences->getClass(curr) == parentClass) {
+        markSetAsUnneeded(curr);
       }        
     }
   }
