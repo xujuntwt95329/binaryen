@@ -127,7 +127,7 @@ private:
     std::map<Literal, Node*> literalNodes;
     for (auto type : { i32, i64, f32, f64, v128 }) { // TODO: centralize?
       auto node = make_unique<Node>();
-      node->literal = LiteralUtils::makeZero(type);
+      node->literal = Literal::makeZero(type);
       literalNodes.emplace(node->literal, node.get());
       nodes.push_back(std::move(node));
     }
@@ -193,7 +193,9 @@ private:
         // currently flooding (as we can do nothing more for it).
         if (getClass(set) == currClass) continue;
         setClasses[set] = currClass;
-        literalClasses[node->literal] = currClass;
+        if (node->literal.type != none) {
+          literalClasses[node->literal] = currClass;
+        }
         for (auto* direct : node->directs) {
           work.push(direct);
         }
