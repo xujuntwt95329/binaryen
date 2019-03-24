@@ -99,32 +99,55 @@ private:
     // equivalence classes (since being equivalent is a symmetric, transitivie, and
     // reflexive operation).
     struct Node {
-      SetLocal* set;
+      SetLocal* set = nullptr;
+      Literal literal;
 
       std::vector<Node*> directs; // direct equivalences, resulting from copying a value
       std::vector<Node*> mergesIn, mergesOut;
-      Literal literal;
 
       void addDirect(Node* other) {
         directs.push_back(other);
         other->directs.push_back(this);
       }
+      void addMergeIn(Node* other) {
+        mergesIn.push_back(other);
+        other->mergesOut.push_back(this);
+      }
     };
     std::vector<std::unique_ptr<Node>> nodes;
-    std::map<SetLocal*, Node*> setNodes;
     // Add sets in the function body.
+    std::map<SetLocal*, Node*> setNodes;
     for (auto* set : allSets.list) {
       auto node = make_unique<Node>();
       node->set = set;
       setNodes.emplace(set, node.get());
       nodes.push_back(std::move(node));
     }
-    // Note sets of a constant, and connect them all.
+    // Add zeros of all types, for the zero inits.
     std::map<Literal, Node*> literalNodes;
+    for (auto type : { i32, i64, f32, f64, v128 }) { // TODO: centralize?
+      auto node = make_unique<Node>();
+      node->literal = LiteralUtils::makeZero(type);
+      literalNodes.emplace(node->literal, node.get());
+      nodes.push_back(std::move(node));
+    }
+    // Utility to get a node, where set may be nullptr, in which case it is
+    // the zero init.
+    auto getNode = [&](SetLocal* set, Type type) {
+      if (set) {
+        return setNodes[set];
+      } else {
+        return literalNodes[Literal::makeZero(type)];
+      }
+    };
     // Add connections.
     for (auto& node : nodes) {
       auto* set = node->set;
+      // Literal nodes will be connected to by others.
+      if (!set) continue;
       auto* value = set->value;
+      // Don't connect unreachable sets, just ignore them.
+      if (value->type == unreachable) continue;
       // Look through trivial fallthrough-ing (but stop if the value were used - TODO?)
       value = Properties::getUnusedFallthrough(value);
       if (auto* tee = value->dynCast<SetLocal>()) {
@@ -132,12 +155,10 @@ private:
       } else if (auto* get = value->dynCast<GetLocal>()) {
         auto& sets = graph.getSetses[get];
         if (sets.size() == 1) {
-          node->addDirect(setNodes[*sets.begin()]);
+          node->addDirect(getNode(*sets.begin(), value->type));
         } else if (sets.size() > 1) {
           for (auto* otherSet : sets) {
-            auto& otherNode = setNodes[otherSet];
-            node->mergesIn.push_back(otherNode);
-            otherNode->mergesOut.push_back(node.get());
+            node->addMergeIn(getNode(otherSet, value->type));
           }
         }
       } else if (auto* c = value->dynCast<Const>()) {
