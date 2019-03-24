@@ -72,6 +72,7 @@ struct LocalGraph {
   // is the zero init, then things like the !!! line cannot exist, and it is valid to replace
   // f(y) with f(x + 20).
   // (This could be simpler, but in wasm the zero init always exists.)
+  // Note that a parameter or zero-init with no other sets is SSA.
 
   void computeSSAIndexes();
 

@@ -34,6 +34,22 @@ inline Expression* makeZero(Type type, Module& wasm) {
   return makeFromInt32(0, type, wasm);
 }
 
+inline bool isEqualTo(Expression* curr, Literal value) {
+  if (auto* c = curr->dynCast<Const>()) {
+    return c->value == value;
+  }
+  return false;
+}
+
+inline bool isEqualTo(Expression* curr, Expression* other) {
+  if (auto* c = curr->dynCast<Const>()) {
+    if (auto* d = other->dynCast<Const>()) {
+      return c->value == d->value;
+    }
+  }
+  return false;
+}
+
 } // namespace LiteralUtils
 
 } // namespace wasm
