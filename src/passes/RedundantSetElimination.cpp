@@ -1,3 +1,4 @@
+#define EQUIVALENCES_DEBUG 1
 /*
  * Copyright 2017 WebAssembly Community Group participants
  *
@@ -64,6 +65,10 @@ private:
     SetLocal* set = nullptr;
     Literal literal;
 
+#if EQUIVALENCES_DEBUG
+    Index index;
+#endif
+
     std::vector<Node*> directs; // direct equivalences, resulting from copying a value
     std::vector<Node*> mergesIn, mergesOut;
 
@@ -100,12 +105,18 @@ private:
     for (auto* set : allSets.list) {
       auto node = make_unique<Node>();
       node->set = set;
+#if EQUIVALENCES_DEBUG
+      node->index = set->index;
+#endif
       setNodes.emplace(set, node.get());
       nodes.push_back(std::move(node));
     }
     // Add the incoming param values.
     for (Index i = 0; i < func->getNumParams(); i++) {
       auto node = make_unique<Node>();
+#if EQUIVALENCES_DEBUG
+      node->index = i;
+#endif
       paramNodes.push_back(node.get());
       nodes.push_back(std::move(node));
     }
@@ -113,6 +124,9 @@ private:
     for (auto type : { i32, i64, f32, f64, v128 }) { // TODO: centralize?
       auto node = make_unique<Node>();
       node->literal = Literal::makeZero(type);
+#if EQUIVALENCES_DEBUG
+      node->index = -1;
+#endif
       literalNodes.emplace(node->literal, node.get());
       nodes.push_back(std::move(node));
     }
@@ -194,7 +208,7 @@ private:
 
 #if EQUIVALENCES_DEBUG
     for (auto& node : nodes) {
-      std::cout << node.get() << " has class " << nodeClasses[node.get()] << " [" << node->set << " / " << node->literal << "]\n";
+      std::cout << node.get() << " has class " << nodeClasses[node.get()] << " [" << node->set << " / " << node->literal << " / " << node->index << "]\n";
     }
 #endif
   }
