@@ -51,72 +51,52 @@ public:
     compute();
   }
 
-  bool areEquivalent(SetLocal* a, SetLocal* b) {
-    return getKnownClass(a) == getKnownClass(b);
-  }
-
   // Return the class. 0 is the "null class" - we haven't calculated it yet.
-  Index getClass(SetLocal* set) {
-    auto iter = setClasses.find(set);
-    if (iter == setClasses.end()) {
-      return 0;
-    }
-    auto ret = iter->second;
-    assert(ret != 0);
-    return ret;
-  }
-
-  Index getKnownClass(SetLocal* set) {
-    auto ret = getClass(set);
-    assert(ret != 0);
-    return ret;
-  }
-
-  bool known(SetLocal* set) {
-    return getClass(set) != 0;
-  }
-
-  Index getClass(Literal literal) {
-    auto iter = literalClasses.find(literal);
-    if (iter == literalClasses.end()) {
-      return 0;
-    }
-    return iter->second;
+  Index getClass(SetLocal* set, Index index) {
+    return nodeClasses[getNode(set, index)];
   }
 
 private:
   Function* func;
   LocalGraph graph;
 
-  // There is a unique id for each class, which this maps sets to.
-  std::unordered_map<SetLocal*, Index> setClasses;
+  struct Node {
+    SetLocal* set = nullptr;
+    Literal literal;
 
-  std::unordered_map<Literal, Index> literalClasses;
+    std::vector<Node*> directs; // direct equivalences, resulting from copying a value
+    std::vector<Node*> mergesIn, mergesOut;
+
+    void addDirect(Node* other) {
+      directs.push_back(other);
+      other->directs.push_back(this);
+    }
+    void addMergeIn(Node* other) {
+      mergesIn.push_back(other);
+      other->mergesOut.push_back(this);
+    }
+  };
+
+  std::vector<std::unique_ptr<Node>> nodes;
+  std::map<Node*, Index> nodeClasses;
+  std::map<SetLocal*, Node*> setNodes;
+  std::vector<Node*> paramNodes;
+  std::map<Literal, Node*> literalNodes;
+
+  Node* getNode(SetLocal* set, Index index) {
+    if (set) {
+      return setNodes[set];
+    } else {
+      if (func->isVar(index)) {
+        return literalNodes[Literal::makeZero(func->getLocalType(index))];
+      }
+      return paramNodes[index];
+    }
+  }
 
   void compute() {
     FindAll<SetLocal> allSets(func->body);
-    // Set up the graph of direct connections. We'll use this to calculate the final
-    // equivalence classes (since being equivalent is a symmetric, transitivie, and
-    // reflexive operation).
-    struct Node {
-      SetLocal* set = nullptr;
-      Literal literal;
-
-      std::vector<Node*> directs; // direct equivalences, resulting from copying a value
-      std::vector<Node*> mergesIn, mergesOut;
-
-      void addDirect(Node* other) {
-        directs.push_back(other);
-        other->directs.push_back(this);
-      }
-      void addMergeIn(Node* other) {
-        mergesIn.push_back(other);
-        other->mergesOut.push_back(this);
-      }
-    };
-    std::vector<std::unique_ptr<Node>> nodes;
     // Add sets in the function body.
-    std::map<SetLocal*, Node*> setNodes;
     for (auto* set : allSets.list) {
       auto node = make_unique<Node>();
       node->set = set;
@@ -124,14 +104,12 @@ private:
       nodes.push_back(std::move(node));
     }
     // Add the incoming param values.
-    std::vector<Node*> paramNodes;
     for (Index i = 0; i < func->getNumParams(); i++) {
       auto node = make_unique<Node>();
       paramNodes.push_back(node.get());
       nodes.push_back(std::move(node));
     }
     // Add zeros of all types, for the zero inits.
-    std::map<Literal, Node*> literalNodes;
     for (auto type : { i32, i64, f32, f64, v128 }) { // TODO: centralize?
       auto node = make_unique<Node>();
       node->literal = Literal::makeZero(type);
@@ -140,16 +118,6 @@ private:
     }
     // Utility to get a node, where set may be nullptr, in which case it is
     // the zero init.
-    auto getNode = [&](SetLocal* set, Index index) {
-      if (set) {
-        return setNodes[set];
-      } else {
-        if (func->isVar(index)) {
-          return literalNodes[Literal::makeZero(func->getLocalType(index))];
-        }
-        return paramNodes[index];
-      }
-    };
     // Add connections.
     for (auto& node : nodes) {
       auto* set = node->set;
@@ -185,7 +153,6 @@ private:
     // Calculating the final classes is mostly a simple floodfill operation,
     // however, merges are more interesting: we can only see that a merge
     // set is equivalent to another if all the things it merges are equivalent.
-    std::map<Node*, Index> nodeClasses;
     Index currClass = 0;
     for (auto& start : nodes) {
       if (nodeClasses[start.get()]) continue;
@@ -224,20 +191,10 @@ private:
         }
       }
     }
-    // Apply node classes to sets
-    for (auto& node : nodes) {
-      if (node->set) {
-        setClasses[node->set] = nodeClasses[node.get()];
-      }
-      if (node->literal.type != none) {
-        literalClasses[node->literal] = nodeClasses[node.get()];
-      }
-    }
 
 #if EQUIVALENCES_DEBUG
     for (auto& node : nodes) {
-      auto* set = node->set;
-      std::cout << "set " << set << " has index " << set->index << " and class " << getClass(set) << '\n';
+      std::cout << node.get() << " has class " << nodeClasses[node.get()] << " [" << node->set << " / " << node->literal << "]\n";
     }
 #endif
   }
@@ -300,13 +257,8 @@ struct RedundantSetElimination : public WalkerPass<PostWalker<RedundantSetElimin
     auto& sets = graph->getSetses[getBeforeSet];
     if (sets.size() == 1) { // TODO: if multiple, check if all equivalent
       auto* parent = *sets.begin();
-      Index parentClass;
-      if (parent) {
-        parentClass = equivalences->getClass(parent);
-      } else {
-        parentClass = equivalences->getClass(Literal::makeZero(curr->value->type));
-      }
-      if (equivalences->getClass(curr) == parentClass) {
+      if (equivalences->getClass(curr, curr->index) ==
+          equivalences->getClass(parent, curr->index)) {
         markSetAsUnneeded(curr);
       }        
     }
