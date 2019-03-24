@@ -1,4 +1,3 @@
-#define EQUIVALENCES_DEBUG 1
 /*
  * Copyright 2017 WebAssembly Community Group participants
  *
@@ -67,6 +66,10 @@ private:
 
 #if EQUIVALENCES_DEBUG
     Index index;
+
+    void dump() {
+      std::cout << this << " [" << set << " / " << literal << " / " << index << "]\n";
+    }
 #endif
 
     std::vector<Node*> directs; // direct equivalences, resulting from copying a value
@@ -130,8 +133,6 @@ private:
       literalNodes.emplace(node->literal, node.get());
       nodes.push_back(std::move(node));
     }
-    // Utility to get a node, where set may be nullptr, in which case it is
-    // the zero init.
     // Add connections.
     for (auto& node : nodes) {
       auto* set = node->set;
@@ -147,10 +148,10 @@ private:
       } else if (auto* get = value->dynCast<GetLocal>()) {
         auto& sets = graph.getSetses[get];
         if (sets.size() == 1) {
-          node->addDirect(getNode(*sets.begin(), set->index));
+          node->addDirect(getNode(*sets.begin(), get->index));
         } else if (sets.size() > 1) {
           for (auto* otherSet : sets) {
-            node->addMergeIn(getNode(otherSet, set->index));
+            node->addMergeIn(getNode(otherSet, get->index));
           }
         }
       } else if (auto* c = value->dynCast<Const>()) {
@@ -208,7 +209,8 @@ private:
 
 #if EQUIVALENCES_DEBUG
     for (auto& node : nodes) {
-      std::cout << node.get() << " has class " << nodeClasses[node.get()] << " [" << node->set << " / " << node->literal << " / " << node->index << "]\n";
+      node->dump();
+      std::cout << "  has class: " << nodeClasses[node.get()] << '\n';
     }
 #endif
   }
