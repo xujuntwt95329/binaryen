@@ -123,6 +123,13 @@ private:
       setNodes.emplace(set, node.get());
       nodes.push_back(std::move(node));
     }
+    // Add the incoming param values.
+    std::vector<Node*> paramNodes;
+    for (Index i = 0; i < func->getNumParams(); i++) {
+      auto node = make_unique<Node>();
+      paramNodes.push_back(node.get());
+      nodes.push_back(std::move(node));
+    }
     // Add zeros of all types, for the zero inits.
     std::map<Literal, Node*> literalNodes;
     for (auto type : { i32, i64, f32, f64, v128 }) { // TODO: centralize?
@@ -133,11 +140,14 @@ private:
     }
     // Utility to get a node, where set may be nullptr, in which case it is
     // the zero init.
-    auto getNode = [&](SetLocal* set, Type type) {
+    auto getNode = [&](SetLocal* set, Index index) {
       if (set) {
         return setNodes[set];
       } else {
-        return literalNodes[Literal::makeZero(type)];
+        if (func->isVar(index)) {
+          return literalNodes[Literal::makeZero(func->getLocalType(index))];
+        }
+        return paramNodes[index];
       }
     };
     // Add connections.
@@ -155,10 +165,10 @@ private:
       } else if (auto* get = value->dynCast<GetLocal>()) {
         auto& sets = graph.getSetses[get];
         if (sets.size() == 1) {
-          node->addDirect(getNode(*sets.begin(), value->type));
+          node->addDirect(getNode(*sets.begin(), set->index));
         } else if (sets.size() > 1) {
           for (auto* otherSet : sets) {
-            node->addMergeIn(getNode(otherSet, value->type));
+            node->addMergeIn(getNode(otherSet, set->index));
           }
         }
       } else if (auto* c = value->dynCast<Const>()) {
@@ -175,38 +185,35 @@ private:
     // Calculating the final classes is mostly a simple floodfill operation,
     // however, merges are more interesting: we can only see that a merge
     // set is equivalent to another if all the things it merges are equivalent.
+    std::map<Node*, Index> nodeClasses;
     Index currClass = 0;
     for (auto& start : nodes) {
-      if (known(start->set)) continue;
+      if (nodeClasses[start.get()]) continue;
       currClass++;
       // Floodfill the current node.
       WorkList<Node*> work;
       work.push(start.get());
       while (!work.empty()) {
         auto* node = work.pop();
-        auto* set = node->set;
         // At this point the class may be unknown, or it may be another class - consider
         // the case that A and B are linked, and merge into C, and we start from C. Then C
         // by itself can do nothing yet, until we first see the other two are identical,
         // and get prompted to look again at C. In that case, we will trample the old
         // class. In other words, we should only stop here if we see the class we are
         // currently flooding (as we can do nothing more for it).
-        if (getClass(set) == currClass) continue;
-        setClasses[set] = currClass;
-        if (node->literal.type != none) {
-          literalClasses[node->literal] = currClass;
-        }
+        if (nodeClasses[node] == currClass) continue;
+        nodeClasses[node] = currClass;
         for (auto* direct : node->directs) {
           work.push(direct);
         }
         // Check outgoing merges - we may have enabled a node to be marked as
         // being in this equivalence class.
         for (auto* mergeOut : node->mergesOut) {
-          if (getClass(mergeOut->set) == currClass) continue;
+          if (nodeClasses[mergeOut] == currClass) continue;
           assert(!mergeOut->mergesIn.empty());
           bool ok = true;
           for (auto* mergeIn : mergeOut->mergesIn) {
-            if (getClass(mergeIn->set) != currClass) {
+            if (nodeClasses[mergeIn] != currClass) {
               ok = false;
               break;
             }
@@ -215,6 +222,15 @@ private:
             work.push(mergeOut);
           }
         }
+      }
+    }
+    // Apply node classes to sets
+    for (auto& node : nodes) {
+      if (node->set) {
+        setClasses[node->set] = nodeClasses[node.get()];
+      }
+      if (node->literal.type != none) {
+        literalClasses[node->literal] = nodeClasses[node.get()];
       }
     }
 
