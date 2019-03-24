@@ -206,7 +206,7 @@ static void markSetAsUnneeded(SetLocal* set) {
   set->value->cast<Block>()->list.pop_back();
 }
 
-static void isSetUnneeded(SetLocal* set) {
+static bool isSetUnneeded(SetLocal* set) {
   return set->value->cast<Block>()->list.size() == 1;
 }
 
@@ -223,11 +223,14 @@ struct RedundantSetElimination : public WalkerPass<PostWalker<RedundantSetElimin
     // Instrument the function so we can tell what value is present at a local
     // index right before each set.
     instrument(func);
-    // Compute the getSets across the instrumented function.
-    LocalGraph graph_(func);
-    graph = graph_;
-    // Remove redundant sets.
-    WalkerPass<PostWalker<RedundantSetElimination>>::doWalkFunction(func);
+    {
+      // Compute the getSets across the instrumented function.
+      LocalGraph graph_(func);
+      graph = &graph_;
+      // Remove redundant sets.
+      WalkerPass<PostWalker<RedundantSetElimination>>::doWalkFunction(func);
+      graph = nullptr; // TODO: is there some std::dependent/borrowed_ptr?
+    }
     // Clean up.
     unInstrument(func);
   }
@@ -281,7 +284,7 @@ private:
       void visitSetLocal(SetLocal* curr) {
         if (curr->type == unreachable) return;
         Builder builder(tempAllocations);
-        set->value = builder.makeSequence(
+        curr->value = builder.makeSequence(
           builder.makeDrop(curr->value),
           builder.makeGetLocal(curr->index, curr->value->type)
         );
@@ -291,14 +294,14 @@ private:
 
   void unInstrument(Function* func) {
     struct UnInstrumenter : public PostWalker<UnInstrumenter> {
-      Instrumenter(Function* func) {
+      UnInstrumenter(Function* func) {
         walk(func->body);
       }
 
       void visitSetLocal(SetLocal* curr) {
         if (curr->type == unreachable) return;
         auto* value = getInstrumentedValue(curr);
-        if (!isSetUnneeded(set)) {
+        if (!isSetUnneeded(curr)) {
           curr->value = value;
         } else {
           ExpressionManipulator::convert<SetLocal, Drop>(curr);
