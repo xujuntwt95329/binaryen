@@ -1,5 +1,16 @@
 (module
  (type $0 (func))
+ (global $global$0 (mut i32) (i32.const 10))
+ (export "func_59_invoker" (func $0))
+ (func $0 (; 0 ;) (; has Stack IR ;) (type $0)
+  (global.set $global$0
+   (i32.const 0)
+  )
+  (unreachable)
+ )
+)
+(module
+ (type $0 (func))
  (type $3 (func (param i32) (result i32)))
  (type $8 (func (result f64)))
  (type $10 (func (param i32) (result f64)))

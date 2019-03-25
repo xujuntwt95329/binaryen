@@ -1,0 +1,48 @@
+(module
+ (type $0 (func))
+ (func $a (; 0 ;) (type $0)
+  (local $x i32)
+  (nop)
+  (loop $l
+   (drop
+    (i32.const 0)
+   )
+   (br_if $l
+    (i32.const 1)
+   )
+  )
+ )
+ (func $no-tee (; 1 ;) (type $0)
+  (local $x i32)
+  (drop
+   (local.tee $x
+    (i32.const 0)
+   )
+  )
+  (loop $l
+   (drop
+    (local.get $x)
+   )
+   (br_if $l
+    (i32.const 1)
+   )
+  )
+ )
+ (func $no-multiget (; 2 ;) (type $0)
+  (local $x i32)
+  (local.set $x
+   (i32.const 0)
+  )
+  (loop $l
+   (drop
+    (local.get $x)
+   )
+   (drop
+    (local.get $x)
+   )
+   (br_if $l
+    (i32.const 1)
+   )
+  )
+ )
+)
