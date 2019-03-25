@@ -49,8 +49,8 @@ struct DeLoopInvariantCodeMotion : public WalkerPass<ControlFlowWalker<DeLoopInv
     // the set can reach the loop without being invalidated, and whether the loop (without
     // that get) invalidates it. If no problems arise, we can apply the optimization.
     // Compute all local dependencies first.
-    LocalGraph localGraphInstance(func);
-    localGraph = &localGraphInstance;
+    LocalGraph localGraph_(func);
+    localGraph = &localGraph_;
     localGraph->computeInfluences();
     localGraph->computeSSAIndexes();
     // Traverse the function.
@@ -58,20 +58,24 @@ struct DeLoopInvariantCodeMotion : public WalkerPass<ControlFlowWalker<DeLoopInv
   }
 
   struct SetInfo {
-    EffectAnalyzer effects;
+    EffectAnalyzer valueEffects;
     ExpressionStack stack;
-    SetInfo(EffectAnalyzer&& effects, ExpressionStack& stack)
-      : effects(effects), stack(stack) {
+    SetInfo(EffectAnalyzer&& valueEffects, ExpressionStack& stack)
+      : valueEffects(valueEffects), stack(stack) {
     }
   };
 
   std::map<SetLocal*, SetInfo> setInfos;
 
   void visitSetLocal(SetLocal* curr) {
-    if (!curr->isTee() && localGraph->isSSA(curr->index)) {
-      EffectAnalyzer effects(getPassOptions(), curr->value);
-      if (!effects.hasSideEffects()) {
-        setInfos.emplace(std::make_pair(curr, SetInfo(std::move(effects), controlFlowStack)));
+    if (curr->type != unreachable && !curr->isTee() && localGraph->isSSA(curr->index)) {
+      // TODO if there is more than 1 get, we could create a tee etc., but must
+      //      be careful to see the first get dominates the rest
+      if (localGraph->setInfluences[curr].size() == 1) {
+        EffectAnalyzer valueEffects(getPassOptions(), curr->value);
+        if (!valueEffects.hasSideEffects()) {
+          setInfos.emplace(std::make_pair(curr, SetInfo(std::move(valueEffects), controlFlowStack)));
+        }
       }
     }
   }
@@ -83,12 +87,26 @@ struct DeLoopInvariantCodeMotion : public WalkerPass<ControlFlowWalker<DeLoopInv
         auto* set = *sets.begin();
         auto iter = setInfos.find(set);
         if (iter != setInfos.end()) {
+          auto* set = iter->first;
           auto& info = iter->second;
-          // We only care about the case where the get is in an inner scope.
-          if (controlFlowStack.size() > info.stack.size()) {
-            auto* set = iter->first;
-            replaceCurrent(set->value);
-            ExpressionManipulator::nop(set);
+          // When checking for invalidation, we must look not just at what
+          // has been traversed so far, but the entirety of relevant loops.
+          // TODO: and vice versa, we are looking at too much here
+          auto& setStack = info.stack;
+          auto& getStack = controlFlowStack;
+          Index i;
+          for (i = 0; i < std::min(setStack.size(), getStack.size()); i++) {
+            if (getStack[i] != setStack[i]) {
+              break;
+            }
+          }
+          if (i < getStack.size()) {
+            EffectAnalyzer otherEffects(getPassOptions(), getStack[i]);
+            if (!otherEffects.invalidates(info.valueEffects)) {
+              replaceCurrent(set->value);
+              ExpressionManipulator::nop(set);
+              setInfos.erase(iter);
+            }
           }
         }
       }
