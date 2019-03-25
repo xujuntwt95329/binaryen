@@ -101,12 +101,14 @@
     )
    )
   )
+  (func $func_vd (param f64) (unreachable))
+  (func $func_vi (param i32) (unreachable))
   (func $infinite-loops-are-possible-in-unreachable-code (result f64)
    (local $0 f64)
    (local $1 f64)
    (if (result f64)
     (block $label$1 (result i32)
-     (call $fimport$1
+     (call $func_vd
       (loop $label$2 (result f64)
        (br_if $label$2
         (block $label$3 (result i32)
@@ -120,7 +122,7 @@
        )
       )
      )
-     (call $fimport$0
+     (call $func_vi
       (br_if $label$1
        (i32.const 0)
        (i32.const 0)
