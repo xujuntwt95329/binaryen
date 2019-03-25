@@ -270,14 +270,14 @@ struct RedundantSetElimination : public WalkerPass<PostWalker<RedundantSetElimin
   void visitSetLocal(SetLocal* curr) {
     if (curr->type == unreachable) return;
     auto* getBeforeSet = getInstrumentedGet(curr);
-    auto& sets = graph->getSetses[getBeforeSet];
-    if (sets.size() == 1) { // TODO: if multiple, check if all equivalent
-      auto* parent = *sets.begin();
-      if (equivalences->getClass(curr, curr->index) ==
-          equivalences->getClass(parent, curr->index)) {
-        markSetAsUnneeded(curr);
+    auto& parents = graph->getSetses[getBeforeSet];
+    auto expected = equivalences->getClass(curr, curr->index);
+    for (auto* parent : parents) {
+      if (equivalences->getClass(parent, curr->index) != expected) {
+        return;
       }        
     }
+    markSetAsUnneeded(curr);
   }
 
 private:
