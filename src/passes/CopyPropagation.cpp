@@ -47,12 +47,14 @@ struct CopyPropagation : public WalkerPass<PostWalker<CopyPropagation>> {
   Pass* create() override { return new CopyPropagation(); }
 
   void doWalkFunction(Function* func) {
+    // Track our changes, as it is possible that in unreachable code we end up
+    // in a cycle (which we just need to break out of - it doesn't matter).
+    std::set<std::pair<GetLocal*, Index>> changesDone;
     while (1) {
       bool worked = false;
       LocalGraph localGraph(func);
       localGraph.computeInfluences();
       localGraph.computeSSAIndexes();
-      auto originalGetSets = localGraph.getSetses;
       for (auto& pair : localGraph.locations) {
         auto* curr = pair.first;
         if (auto* get = curr->dynCast<GetLocal>()) {
@@ -60,7 +62,7 @@ struct CopyPropagation : public WalkerPass<PostWalker<CopyPropagation>> {
             // Given a get, we have a relevant set if it has exactly one set, the set
             // is not nullptr, and it is reachable.
             auto getRelevantSet = [&](GetLocal* get) -> SetLocal* {
-              auto& sets = originalGetSets[get];
+              auto& sets = localGraph.getSetses[get];
               if (sets.size() == 1) {
                 auto* set = *sets.begin();
                 if (set && set->type != unreachable) {
@@ -79,8 +81,8 @@ struct CopyPropagation : public WalkerPass<PostWalker<CopyPropagation>> {
             };
             if (auto* set = getRelevantSet(get)) {
               if (auto* value = getRelevantSetValue(set)) {
-                // Looks relevant - find all possible indexes.
-                std::set<Index> possibleIndexes;
+                // Looks relevant - go as far back as possible.
+                Index bestIndex = get->index;
                 OneTimeWorkList<Expression*> work;
                 work.push(value);
                 while (!work.empty()) {
@@ -89,7 +91,7 @@ struct CopyPropagation : public WalkerPass<PostWalker<CopyPropagation>> {
                     auto index = otherSet->index;
                     if (localGraph.isSSA(index)) {
                       if (index != get->index) {
-                        possibleIndexes.insert(index);
+                        bestIndex = index;
                       }
                       if (auto* otherValue = getRelevantSetValue(otherSet)) {
                         work.push(otherValue);
@@ -99,7 +101,7 @@ struct CopyPropagation : public WalkerPass<PostWalker<CopyPropagation>> {
                     auto index = otherGet->index;
                     if (localGraph.isSSA(index)) {
                       if (index != get->index) {
-                        possibleIndexes.insert(index);
+                        bestIndex = index;
                       }
                       if (auto* otherSet = getRelevantSet(otherGet)) {
                         work.push(otherSet);
@@ -110,13 +112,14 @@ struct CopyPropagation : public WalkerPass<PostWalker<CopyPropagation>> {
                   }
                 }
                 // We found all the possible indexes that are equivalent to our own, pick the best.
-                if (!possibleIndexes.empty()) {
-                  auto bestIndex = *std::min_element(possibleIndexes.begin(), possibleIndexes.end());
-                  assert(bestIndex != get->index);
-                  get->index = bestIndex;
-                  worked = true;
-                  // Note that we don't update getSets here - we work on the original data, and just
-                  // make changes that preserve equivalence while we work.
+                if (bestIndex != get->index) {
+                  auto change = std::make_pair(get, bestIndex);
+                  if (changesDone.insert(change).second) {
+                    get->index = bestIndex;
+                    worked = true;
+                    // Note that we don't update getSets here - we work on the original data, and just
+                    // make changes that preserve equivalence while we work.
+                  }
                 }
               }
             }

@@ -2,6 +2,7 @@
  (type $0 (func (param i32 i32 i32) (result i32)))
  (type $1 (func (param i32)))
  (type $2 (func (result i32)))
+ (type $3 (func (result f64)))
  (func $multipass (; 0 ;) (type $0) (param $0 i32) (param $1 i32) (param $2 i32) (result i32)
   (local $3 i32)
   (if
@@ -120,6 +121,35 @@
      (f64.const 0)
     )
    )
+  )
+ )
+ (func $infinite-loops-are-possible-in-unreachable-code (; 5 ;) (type $3) (result f64)
+  (local $0 f64)
+  (local $1 f64)
+  (if (result f64)
+   (block $label$1 (result i32)
+    (drop
+     (loop $label$2 (result f64)
+      (br_if $label$2
+       (unreachable)
+      )
+      (local.tee $0
+       (local.tee $1
+        (local.get $0)
+       )
+      )
+     )
+    )
+    (drop
+     (br_if $label$1
+      (i32.const 0)
+      (i32.const 0)
+     )
+    )
+    (unreachable)
+   )
+   (local.get $0)
+   (local.get $1)
   )
  )
 )
