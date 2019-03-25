@@ -101,4 +101,35 @@
     )
    )
   )
+  (func $infinite-loops-are-possible-in-unreachable-code (result f64)
+   (local $0 f64)
+   (local $1 f64)
+   (if (result f64)
+    (block $label$1 (result i32)
+     (call $fimport$1
+      (loop $label$2 (result f64)
+       (br_if $label$2
+        (block $label$3 (result i32)
+         (unreachable)
+        )
+       )
+       (local.tee $0
+        (local.tee $1
+         (local.get $0)
+        )
+       )
+      )
+     )
+     (call $fimport$0
+      (br_if $label$1
+       (i32.const 0)
+       (i32.const 0)
+      )
+     )
+     (unreachable)
+    )
+    (local.get $0)
+    (local.get $1)
+   )
+  )
 )
