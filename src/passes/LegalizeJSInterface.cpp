@@ -40,6 +40,7 @@
 #include "shared-constants.h"
 #include "asmjs/shared-constants.h"
 #include "wasm-builder.h"
+#include "abi/js.h"
 #include "ir/function-type-utils.h"
 #include "ir/import-utils.h"
 #include "ir/literal-utils.h"
@@ -53,6 +54,8 @@ struct LegalizeJSInterface : public Pass {
   LegalizeJSInterface(bool full) : full(full) {}
 
   void run(PassRunner* runner, Module* module) override {
+    tempHighBits = ABI::ensureI64Support(*module);
+
     // for each illegal export, we must export a legalized stub instead
     for (auto& ex : module->exports) {
       if (ex->kind == ExternalKind::Function) {
@@ -116,11 +119,18 @@ struct LegalizeJSInterface : public Pass {
       passRunner.add<FixImports>(&illegalImportsToLegal);
       passRunner.run();
     }
+
+    PassRunner passRunner(module);
+    passRunner.setIsNested(true);
+    passRunner.add("print");
+    passRunner.run();
   }
 
 private:
   // map of illegal to legal names for imports
   std::map<Name, Name> illegalImportsToLegal;
+
+  Name tempHighBits;
 
   template<typename T>
   bool isIllegal(T* t) {
@@ -169,12 +179,11 @@ private:
     }
 
     if (func->result == i64) {
-      Function* f = getFunctionOrImport(module, SET_TEMP_RET0, "vi");
       legal->result = i32;
       auto index = Builder::addVar(legal, Name(), i64);
       auto* block = builder.makeBlock();
       block->list.push_back(builder.makeSetLocal(index, call));
-      block->list.push_back(builder.makeCall(f->name, {I64Utilities::getI64High(builder, index)}, none));
+      block->list.push_back(builder.makeSetGlobal(tempHighBits, I64Utilities::getI64High(builder, index)));
       block->list.push_back(I64Utilities::getI64Low(builder, index));
       block->finalize();
       legal->body = block;
@@ -228,9 +237,8 @@ private:
     }
 
     if (imFunctionType->result == i64) {
-      Function* f = getFunctionOrImport(module, GET_TEMP_RET0, "i");
       call->type = i32;
-      Expression* get = builder.makeCall(f->name, {}, call->type);
+      Expression* get = builder.makeGetGlobal(tempHighBits, i32);
       func->body = I64Utilities::recreateI64(builder, call, get);
       type->result = i32;
     } else if (imFunctionType->result == f32) {
@@ -256,28 +264,6 @@ private:
       module->addFunction(std::move(legal));
     }
     return funcName;
-  }
-
-  static Function* getFunctionOrImport(Module* module, Name name, std::string sig) {
-    // First look for the function by name
-    if (Function* f = module->getFunctionOrNull(name)) {
-      return f;
-    }
-    // Then see if its already imported
-    ImportInfo info(*module);
-    if (Function* f = info.getImportedFunction(ENV, name)) {
-      return f;
-    }
-    // Failing that create a new function import.
-    auto import = new Function;
-    import->name = name;
-    import->module = ENV;
-    import->base = name;
-    auto* functionType = ensureFunctionType(std::move(sig), module);
-    import->type = functionType->name;
-    FunctionTypeUtils::fillFunction(import, functionType);
-    module->addFunction(import);
-    return import;
   }
 };
 

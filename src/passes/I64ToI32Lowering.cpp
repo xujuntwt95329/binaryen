@@ -27,6 +27,7 @@
 #include "emscripten-optimizer/istring.h"
 #include "support/name.h"
 #include "wasm-builder.h"
+#include "abi/js.h"
 #include "ir/flat.h"
 #include "ir/memory-utils.h"
 #include "ir/module-utils.h"
@@ -114,12 +115,8 @@ struct I64ToI32Lowering : public WalkerPass<PostWalker<I64ToI32Lowering>> {
 
     // For functions that return 64-bit values, we use this global variable
     // to return the high 32 bits.
-    auto* highBits = new Global();
-    highBits->type = i32;
-    highBits->name = INT64_TO_32_HIGH_BITS;
-    highBits->init = builder->makeConst(Literal(int32_t(0)));
-    highBits->mutable_ = true;
-    module->addGlobal(highBits);
+    tempHighBits = ABI::ensureI64Support(*module);
+
     PostWalker<I64ToI32Lowering>::doWalkModule(module);
   }
 
@@ -192,7 +189,7 @@ struct I64ToI32Lowering : public WalkerPass<PostWalker<I64ToI32Lowering>> {
           func->body
         );
         SetGlobal* setHigh = builder->makeSetGlobal(
-          INT64_TO_32_HIGH_BITS,
+          tempHighBits,
           builder->makeGetLocal(highBits, i32)
         );
         GetLocal* getLow = builder->makeGetLocal(lowBits, i32);
@@ -345,7 +342,7 @@ struct I64ToI32Lowering : public WalkerPass<PostWalker<I64ToI32Lowering>> {
     );
     SetLocal* setHigh = builder->makeSetLocal(
       highBits,
-      builder->makeGetGlobal(INT64_TO_32_HIGH_BITS, i32)
+      builder->makeGetGlobal(tempHighBits, i32)
     );
     GetLocal* getLow = builder->makeGetLocal(lowBits, i32);
     Block* result = builder->blockify(doCall, setHigh, getLow);
@@ -1591,7 +1588,7 @@ struct I64ToI32Lowering : public WalkerPass<PostWalker<I64ToI32Lowering>> {
     TempVar highBits = fetchOutParam(curr->value);
     SetLocal* setLow = builder->makeSetLocal(lowBits, curr->value);
     SetGlobal* setHigh = builder->makeSetGlobal(
-      INT64_TO_32_HIGH_BITS,
+      tempHighBits,
       builder->makeGetLocal(highBits, i32)
     );
     curr->value = builder->makeGetLocal(lowBits, i32);
@@ -1607,6 +1604,7 @@ private:
   std::unordered_map<Name, TempVar> labelHighBitVars;
   std::unordered_map<Index, Type> tempTypes;
   Index nextTemp;
+  Name tempHighBits;
 
   TempVar getTemp(Type ty = i32) {
     Index ret;
