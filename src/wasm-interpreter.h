@@ -27,6 +27,7 @@
 #include <limits.h>
 #include <sstream>
 
+#include "ir/iteration.h"
 #include "ir/module-utils.h"
 #include "support/bits.h"
 #include "support/safe_integer.h"
@@ -128,23 +129,56 @@ public:
 // Execute an expression
 template<typename SubType>
 class ExpressionRunner : public OverriddenVisitor<SubType, Flow> {
-public:
-  Flow visit(Expression* curr) {
-    auto ret = OverriddenVisitor<SubType, Flow>::visit(curr);
-    if (!ret.breaking() &&
-        (isConcreteType(curr->type) || isConcreteType(ret.value.type))) {
-#if 1 // def WASM_INTERPRETER_DEBUG
-      if (ret.value.type != curr->type) {
-        std::cerr << "expected " << printType(curr->type) << ", seeing "
-                  << printType(ret.value.type) << " from\n"
-                  << curr << '\n';
-      }
-#endif
-      assert(ret.value.type == curr->type);
-    }
+  // The stack of expressions to be run.
+  std::vector<Expression*> expressionStack;
+
+  void push(Expression* curr) {
+    expressionStack.push_back(curr);
+  }
+
+  Expression* popExpression() {
+    assert(!expressionStack.empty());
+    auto ret = expressionStack.back();
+    expressionStack.pop_back();
     return ret;
   }
 
+  // The stack of results from expressions that were run.
+  std::vector<Flow> flowStack;
+
+  void push(Flow flow) {
+    flowStack.push_back(flow);
+  }
+
+  Flow popFlow() {
+    assert(!flowStack.empty());
+    auto ret = flowStack.back();
+    flowStack.pop_back();
+    return ret;
+  }
+
+public:
+  // Main entry point: run an expression and return the final
+  // flowing result from it.
+  Flow run(Expression* curr) {
+    assert(expressionStack.empty() && flowStack.empty());
+    visit(curr);
+    assert(expressionStack.empty() && flowStack.size() == 1);
+    return popFlow();
+  }
+
+  // Generic visit of an expression: Adds its children to the
+  // expression stack, then adds itself. The main code in run()
+  // will then populate the flow stack with the children's
+  // results, and when we visit the parent it will pop them and
+  // return its own result.
+  Flow visit(Expression* curr) {
+    for (auto* child : ChildIterator(curr)) {
+      
+    auto ret = OverriddenVisitor<SubType, Flow>::visit(curr);
+  }
+
+  // Visitors. Each
   Flow visitBlock(Block* curr) {
     NOTE_ENTER("Block");
     // special-case Block, because Block nesting (in their first element) can be
