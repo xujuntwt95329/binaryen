@@ -40,8 +40,35 @@ inline Index stackAlign(Index size) {
 // just local.get it anywhere there.
 inline void
 getStackSpace(Index local, Function* func, Index size, Module& wasm) {
+  // In fastcomp. STACKTOP is the name of the stack pointer.
   auto* stackPointer =
     GlobalUtils::getGlobalInitializedToImport(wasm, ENV, "STACKTOP");
+  if (!stackPointer) {
+    // If we didn't recognize it by name, look for the emscripten stackSave
+    // function, which reads the stack pointer
+    if (auto* exp = wasm.getExportOrNull("stackSave")) {
+      if (exp->kind == ExternalKind::Function) {
+        auto* func = wasm.getFunction(exp->value);
+        auto* body = func->body;
+        if (auto* block = body->dynCast<Block>()) {
+          if (block->list.size() == 1) {
+            body = block->list[0];
+          }
+        }
+        if (auto* ret = body->dynCast<Return>()) {
+          if (ret->value) {
+            body = ret->value;
+          }
+        }
+        if (auto* get = body->dynCast<GlobalGet>()) {
+          stackPointer = wasm.getGlobal(get->name);
+        }
+      }
+    }
+  }
+  // In general we may not be able to find it, for example if the stackSave
+  // method was metadce'd out. In that case, building without metadce (-O2
+  // instead of -O3 in emscripten) may help.
   if (!stackPointer) {
     Fatal() << "getStackSpace: failed to find the stack pointer";
   }
@@ -55,6 +82,8 @@ getStackSpace(Index local, Function* func, Index size, Module& wasm) {
   // TODO: add stack max check
   Expression* added;
   if (PointerType == i32) {
+    // XXX the wasm backend's stack goes down, not up! Should we use
+    // stackAlloc/stackSave/stackRestore?
     added = builder.makeBinary(AddInt32,
                                builder.makeLocalGet(local, PointerType),
                                builder.makeConst(Literal(int32_t(size))));

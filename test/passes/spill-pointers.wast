@@ -165,4 +165,44 @@
     (drop (local.get $x))
   )
 )
-
+(module
+  (memory 1 2)
+  (global $stack_ptr (mut i32) (i32.const 0))
+  (export "stackSave" (func $ss))
+  (func $spill
+    (local $x i32)
+    (call $spill)
+    (drop (local.get $x))
+  )
+  (func $ss (result i32)
+    (global.get $stack_ptr)
+  )
+)
+(module
+  (memory 1 2)
+  (global $stack_ptr (mut i32) (i32.const 0))
+  (export "stackSave" (func $ss))
+  (func $spill
+    (local $x i32)
+    (call $spill)
+    (drop (local.get $x))
+  )
+  (func $ss (result i32)
+    (return (global.get $stack_ptr))
+  )
+)
+(module
+  (memory 1 2)
+  (global $stack_ptr (mut i32) (i32.const 0))
+  (export "stackSave" (func $ss))
+  (func $spill
+    (local $x i32)
+    (call $spill)
+    (drop (local.get $x))
+  )
+  (func $ss (result i32)
+    (block
+      (return (global.get $stack_ptr))
+    )
+  )
+)
