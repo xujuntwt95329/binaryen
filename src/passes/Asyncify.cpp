@@ -217,6 +217,7 @@
 #include "ir/literal-utils.h"
 #include "ir/memory-utils.h"
 #include "ir/module-utils.h"
+#include "ir/table-utils.h"
 #include "ir/utils.h"
 #include "pass.h"
 #include "support/string.h"
@@ -324,12 +325,14 @@ class ModuleAnalyzer {
   typedef std::map<Function*, Info> Map;
   Map map;
 
+  FlatTable flatTable;
+
 public:
   ModuleAnalyzer(Module& module,
                  std::function<bool(Name, Name)> canImportChangeState,
                  bool canIndirectChangeState)
     : module(module), canIndirectChangeState(canIndirectChangeState),
-      globals(module) {
+      flatTable(module.table), globals(module) {
     // Scan to see which functions can directly change the state.
     // Also handle the asyncify imports, removing them (as we will implement
     // them later), and replace calls to them with calls to the later proper
@@ -349,7 +352,7 @@ public:
         }
         struct Walker : PostWalker<Walker> {
           void visitCall(Call* curr) {
-            auto* target = module->getFunction(curr->target);
+            auto* target = analyzer->getCallTarget(curr);
             if (target->imported() && target->module == ASYNCIFY) {
               // Redirect the imports to the functions we'll add later.
               if (target->base == START_UNWIND) {
@@ -382,11 +385,13 @@ public:
           }
           Info* info;
           Module* module;
+          ModuleAnalyzer* analyzer;
           bool canIndirectChangeState;
         };
         Walker walker;
         walker.info = &info;
         walker.module = &module;
+        walker.analyzer = this;
         walker.canIndirectChangeState = canIndirectChangeState;
         walker.walk(func->body);
 
@@ -463,7 +468,7 @@ public:
           return;
         }
         // The target may not exist if it is one of our temporary intrinsics.
-        auto* target = module->getFunctionOrNull(curr->target);
+        auto* target = analyzer->getCallTarget(curr);
         if (target && (*map)[target].canChangeState) {
           canChangeState = true;
         }
@@ -475,6 +480,7 @@ public:
         // TODO optimize the other case, at least by type
       }
       Module* module;
+      ModuleAnalyzer* analyzer;
       Map* map;
       bool canIndirectChangeState;
       bool canChangeState = false;
@@ -482,6 +488,7 @@ public:
     };
     Walker walker;
     walker.module = &module;
+    walker.analyzer = this;
     walker.map = &map;
     walker.canIndirectChangeState = canIndirectChangeState;
     walker.walk(curr);
@@ -489,6 +496,32 @@ public:
       walker.canChangeState = false;
     }
     return walker.canChangeState;
+  }
+
+  Function* getCallTarget(Call* call) {
+    // The target may not exist if it is one of our temporary intrinsics.
+    auto* target = module.getFunctionOrNull(call->target);
+    if (!target || !target->imported()) {
+      return target;
+    }
+    // An import may be analyzable in some cases: an invoke looks like a call
+    // to an import, but the call target is statically known in many cases,
+    // and the invoke is only used to be able to catch exceptions in JS. FIXME
+    if (flatTable.valid) {
+      std::string full = std::string(target->module.str) + '.' + target->base.str;
+      if (full.find("env.invoke") == 0) {
+        // The first argument is the table index. If it's constant, we know where
+        // it's going, as the invoke ABI never uses mutability of the table.
+        assert(!call->operands.empty());
+        auto* first = call->operands[0];
+        if (auto* c = first->dynCast<Const>()) {
+          auto index = c->value.geti32();
+          auto newTarget = flatTable.names.at(index);
+          return module.getFunctionOrNull(newTarget);
+        }
+      }
+    }
+    return target;
   }
 
   GlobalHelper globals;
