@@ -51,6 +51,8 @@ int main(int argc, const char* argv[]) {
   bool checkStackOverflow = false;
   uint64_t globalBase = INVALID_BASE;
   bool emitDynCallThunks = true;
+  Index sbrkPtr = -1;
+
   ToolOptions options("wasm-emscripten-finalize",
                       "Performs Emscripten-specific transforms on .wasm files");
   options
@@ -138,10 +140,17 @@ int main(int argc, const char* argv[]) {
           })
     .add("--no-dyncalls",
          "",
-         "Do not emit dynCalls"
+         "Do not emit dynCalls",
          Options::Arguments::Zero,
          [&emitDynCallThunks](Options* o, const std::string&) {
            emitDynCallThunks = false;
+         })
+    .add("--sbrk-ptr",
+         "",
+         "Apply the location of the sbrk pointer",
+         Options::Arguments::One,
+         [&sbrkPtr](Options*, const std::string& argument) {
+           sbrkPtr = std::stoull(argument);
          })
     .add_positional("INFILE",
                     Options::Arguments::One,
@@ -243,6 +252,10 @@ int main(int argc, const char* argv[]) {
 
   if (emitDynCallThunks) {
     generator.generateDynCallThunks();
+  }
+
+  if (sbrkPtr != Index(-1)) {
+    generator.applySbrkPtr(sbrkPtr);
   }
 
   // Legalize the wasm.

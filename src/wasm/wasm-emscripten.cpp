@@ -1210,4 +1210,21 @@ void EmscriptenGlueGenerator::separateDataSegments(Output* outfile,
   wasm.memory.segments.clear();
 }
 
+void EmscriptenGlueGenerator::applySbrkPtr(Index ptr) {
+  // The compiled code has a call to env.emscripten_get_sbrk_ptr, which is
+  // imported. We replace that import with a defined function that returns
+  // the proper value.
+  ImportInfo info(wasm);
+  if (auto* func = info.getImportedFunction(ENV, "emscripten_get_sbrk_ptr")) {
+    // Stop importing the function.
+    func->module = func->base = Name();
+    assert(!func->imported());
+    // Implement the body.
+    Builder builder(wasm);
+    func->body = builder.makeConst(Literal(int32_t(ptr)));
+  } else {
+    Fatal() << "Failed to find the function to applySbrkPtr on.";
+  }
+}
+
 } // namespace wasm
