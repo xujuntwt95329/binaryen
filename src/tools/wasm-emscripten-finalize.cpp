@@ -52,6 +52,7 @@ int main(int argc, const char* argv[]) {
   uint64_t globalBase = INVALID_BASE;
   bool emitDynCallThunks = true;
   Index sbrkPtr = -1;
+  bool exportStart = false;
 
   ToolOptions options("wasm-emscripten-finalize",
                       "Performs Emscripten-specific transforms on .wasm files");
@@ -151,6 +152,13 @@ int main(int argc, const char* argv[]) {
          Options::Arguments::One,
          [&sbrkPtr](Options*, const std::string& argument) {
            sbrkPtr = std::stoull(argument);
+         })
+    .add("--export-start",
+         "",
+         "Always export a start function",
+         Options::Arguments::Zero,
+         [&exportStart](Options* o, const std::string&) {
+           exportStart = true;
          })
     .add_positional("INFILE",
                     Options::Arguments::One,
@@ -256,6 +264,10 @@ int main(int argc, const char* argv[]) {
 
   if (sbrkPtr != Index(-1)) {
     generator.applySbrkPtr(sbrkPtr);
+  }
+
+  if (exportStart) {
+    generator.exportStart();
   }
 
   // Legalize the wasm.

@@ -58,6 +58,8 @@ public:
 
   void applySbrkPtr(Index ptr);
 
+  void exportStart();
+
   // Emits the data segments to a file. The file contains data from address base
   // onwards (we must pass in base, as we can't tell it from the wasm - the
   // first segment may start after a run of zeros, but we need those zeros in
