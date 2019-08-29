@@ -27,10 +27,12 @@
 
 namespace wasm {
 
-struct PostEmscripten : public WalkerPass<PostWalker<PostEmscripten>> {
+namespace {
+
+struct OptimizeCalls : public WalkerPass<PostWalker<OptimizeCalls>> {
   bool isFunctionParallel() override { return true; }
 
-  Pass* create() override { return new PostEmscripten; }
+  Pass* create() override { return new OptimizeCalls; }
 
   void visitCall(Call* curr) {
     // special asm.js imports can be optimized
@@ -57,6 +59,17 @@ struct PostEmscripten : public WalkerPass<PostWalker<PostEmscripten>> {
         }
       }
     }
+  }
+};
+
+struct PostEmscripten : public Pass {
+  void run(PassRunner* runner, Module* module) override {
+    // Apply the sbrk ptr, if it was provided.
+    auto sbrkPtr =
+      runner->options.getArgumentOrDefault("emscripten-sbrk-ptr", "");
+
+    // Optimize calls
+    OptimizeCalls.run(runner, module);
   }
 };
 
