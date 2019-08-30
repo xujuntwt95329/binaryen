@@ -1056,7 +1056,8 @@ struct Asyncify : public Pass {
       runner->options.getArgumentOrDefault("asyncify-blacklist", ""), ",");
     String::Split whitelist(
       runner->options.getArgumentOrDefault("asyncify-whitelist", ""), ",");
-    auto exportState = runner->options.getArgumentOrDefault("asyncify-export-state", "") != "";
+    auto exportState =
+      runner->options.getArgumentOrDefault("asyncify-export-state", "") != "";
 
     blacklist = handleBracketingOperators(blacklist);
     whitelist = handleBracketingOperators(whitelist);
@@ -1174,8 +1175,14 @@ private:
                                          builder.makeConst(Literal(int32_t(0))),
                                          Builder::Mutable));
     if (exportState) {
-      module->addFunction(builder.makeFunction(ASYNCIFY_GET_STATE, std::vector<Type>{}, i32, std::vector<Type>{}, builder.makeGlobalGet(ASYNCIFY_STATE, i32)));
-      module->addExport(builder.makeExport(ASYNCIFY_GET_STATE, ASYNCIFY_GET_STATE, ExternalKind::Function);
+      auto name = ASYNCIFY_GET_STATE;
+      module->addFunction(
+        builder.makeFunction(name,
+                             std::vector<Type>{},
+                             i32,
+                             std::vector<Type>{},
+                             builder.makeGlobalGet(ASYNCIFY_STATE, i32)));
+      module->addExport(builder.makeExport(name, name, ExternalKind::Function);
     }
   }
 
