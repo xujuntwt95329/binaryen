@@ -237,6 +237,11 @@
 //      will be instrumented. Like the blacklist, getting this wrong will
 //      break your application.
 //
+//   --pass-arg=asyncify-export-state
+//
+//      Export a function that indicates the async state. This can be useful
+//      if you want to check the state from the outside.
+//
 // TODO When wasm has GC, extending the live ranges of locals can keep things
 //      alive unnecessarily. We may want to set locals to null at the end
 //      of their original range.
@@ -272,6 +277,7 @@ static const Name START_REWIND = "start_rewind";
 static const Name STOP_REWIND = "stop_rewind";
 static const Name ASYNCIFY_GET_CALL_INDEX = "__asyncify_get_call_index";
 static const Name ASYNCIFY_CHECK_CALL_INDEX = "__asyncify_check_call_index";
+static const Name ASYNCIFY_GET_STATE = "asyncify_get_state";
 
 // TODO: having just normal/unwind_or_rewind would decrease code
 //       size, but make debugging harder
@@ -1050,6 +1056,7 @@ struct Asyncify : public Pass {
       runner->options.getArgumentOrDefault("asyncify-blacklist", ""), ",");
     String::Split whitelist(
       runner->options.getArgumentOrDefault("asyncify-whitelist", ""), ",");
+    auto exportState = runner->options.getArgumentOrDefault("asyncify-export-state", "") != "";
 
     blacklist = handleBracketingOperators(blacklist);
     whitelist = handleBracketingOperators(whitelist);
@@ -1102,7 +1109,7 @@ struct Asyncify : public Pass {
                             whitelist);
 
     // Add necessary globals before we emit code to use them.
-    addGlobals(module);
+    addGlobals(module, exportState);
 
     // Instrument the flow of code, adding code instrumentation and
     // skips for when rewinding. We do this on flat IR so that it is
@@ -1156,7 +1163,7 @@ struct Asyncify : public Pass {
   }
 
 private:
-  void addGlobals(Module* module) {
+  void addGlobals(Module* module, bool exportState) {
     Builder builder(*module);
     module->addGlobal(builder.makeGlobal(ASYNCIFY_STATE,
                                          i32,
@@ -1166,6 +1173,10 @@ private:
                                          i32,
                                          builder.makeConst(Literal(int32_t(0))),
                                          Builder::Mutable));
+    if (exportState) {
+      module->addFunction(builder.makeFunction(ASYNCIFY_GET_STATE, std::vector<Type>{}, i32, std::vector<Type>{}, builder.makeGlobalGet(ASYNCIFY_STATE, i32)));
+      module->addExport(builder.makeExport(ASYNCIFY_GET_STATE, ASYNCIFY_GET_STATE, ExternalKind::Function);
+    }
   }
 
   void addFunctions(Module* module) {
