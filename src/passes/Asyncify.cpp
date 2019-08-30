@@ -1182,7 +1182,7 @@ private:
                              i32,
                              std::vector<Type>{},
                              builder.makeGlobalGet(ASYNCIFY_STATE, i32)));
-      module->addExport(builder.makeExport(name, name, ExternalKind::Function);
+      module->addExport(builder.makeExport(name, name, ExternalKind::Function));
     }
   }
 
