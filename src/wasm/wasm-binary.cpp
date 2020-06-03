@@ -999,7 +999,8 @@ void WasmBinaryBuilder::readImports() {
     // due to the names section.
     switch (kind) {
       case ExternalKind::Function: {
-        auto name = Name(std::string("fimport$") + std::to_string(i));
+        // auto name = Name(std::string("fimport$") + std::to_string(i));
+        auto name = Name(base.str);
         auto index = getU32LEB();
         if (index >= wasm.functionTypes.size()) {
           throwError("invalid function index " + std::to_string(index) + " / " + std::to_string(wasm.functionTypes.size()));
@@ -1094,6 +1095,18 @@ void WasmBinaryBuilder::readFunctions() {
 
     Function *func = new Function;
     func->name = Name::fromInt(i);
+
+    //if the function is a export function, we use the export name for the function
+    std::map<Export*, Index>::iterator it;
+    it = exportIndexes.begin();
+    std::string export_name;
+
+    while(it != exportIndexes.end())
+    {
+      if(it->second == functionImports.size() + i && it->first->kind == ExternalKind::Function)
+        func->name = it->first->name;
+      it++;
+    }
     currFunction = func;
 
     readNextDebugLocation();
@@ -1162,6 +1175,17 @@ void WasmBinaryBuilder::readExports() {
     auto index = getU32LEB();
     exportIndexes[curr] = index;
     exportOrder.push_back(curr);
+    if(curr->kind == ExternalKind::Global)
+    {
+      wasm::Global * global = wasm.getGlobalOrNull("global$" + std::to_string(index));
+      if(global != NULL)
+      {
+        global->name = curr->name;
+        wasm.updateMaps();
+        mappedGlobals.clear(); // wipe the mapping
+        getGlobalName(-1); // force rebuild
+      }
+    }
   }
 }
 
@@ -1350,8 +1374,21 @@ void WasmBinaryBuilder::readGlobals() {
     auto mutable_ = getU32LEB();
     if (mutable_ & ~1) throwError("Global mutability must be 0 or 1");
     auto* init = readExpression();
+    
+    //if the function is a export function, we use the export name for the function
+    std::map<Export*, Index>::iterator it;
+    it = exportIndexes.begin();
+    std::string export_name = "global$" + std::to_string(i);
+
+    while(it != exportIndexes.end())
+    {
+      if(it->second == i && it->first->kind == ExternalKind::Global)
+        export_name = it->first->name.str;
+      it++;
+    }
+
     wasm.addGlobal(Builder::makeGlobal(
-      "global$" + std::to_string(i),
+      export_name,
       type,
       init,
       mutable_ ? Builder::Mutable : Builder::Immutable
